@@ -6,7 +6,7 @@ Personal Diwali greeting pages for each employee, with links and QR codes. Plain
 |---|---|
 | `index.html` | The greeting page. Opens as `index.html?t=<token>` |
 | `generate.html` | Makes links + QR codes: one at a time, or many from JSON / CSV. Also prints QR sheets |
-| `config.js` | Settings: default leader name/title (each link can set its own), letter text, form fields, secret key, link style |
+| `config.js` | Settings: default From Name / From Role (each link can set its own), letter text, form fields, secret key, link style |
 | `token.js` | Creates and checks the tokens |
 | `images/` | Employee photos, named after the employee: `rahul_sharma.jpg` for "Rahul Sharma" |
 | `404.html` | GitHub Pages only: makes short links `/<token>` and `/generate` work |

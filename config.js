@@ -9,7 +9,7 @@ window.GREETING_CONFIG = {
   SECRET_KEY: 'change-this-secret-key-2026',
   SIG_LENGTH: 10,
 
-  // Signature at the end of every letter. Used when a link has no Leader Name / Leader Title of its own.
+  // Signature at the end of every letter. Used when a link has no From Name / From Role of its own.
   LEADER_NAME: 'Ashish Chawan',
   LEADER_TITLE: 'Team Leader',
 
@@ -28,8 +28,8 @@ window.GREETING_CONFIG = {
   FIELDS: {
     name: 'Employee Name',
     department: 'Department',
-    leader: 'Leader Name (optional)',
-    leader_title: 'Leader Title (optional)',
+    from_name: 'From Name',
+    from_role: 'From Role',
     image: 'Image URL (optional)',
   },
 
@@ -37,8 +37,8 @@ window.GREETING_CONFIG = {
   ALIASES: {
     'emp name': 'name', 'emp_name': 'name', 'employee name': 'name', 'employee_name': 'name',
     'dept': 'department',
-    'leader name': 'leader', 'leader_name': 'leader', 'team lead': 'leader', 'team leader': 'leader', 'from': 'leader',
-    'leader title': 'leader_title', 'title': 'leader_title', 'designation': 'leader_title', 'lead title': 'leader_title',
+    'from name': 'from_name', 'from': 'from_name', 'leader': 'from_name', 'leader name': 'from_name', 'leader_name': 'from_name', 'team lead': 'from_name', 'team leader': 'from_name',
+    'from role': 'from_role', 'role': 'from_role', 'leader title': 'from_role', 'leader_title': 'from_role', 'designation': 'from_role', 'title': 'from_role',
     'image url': 'image', 'image_url': 'image', 'img': 'image', 'photo': 'image',
   },
 

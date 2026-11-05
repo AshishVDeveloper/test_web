@@ -106,6 +106,11 @@
             <textarea id="bulk" name="bulk" placeholder="Paste JSON array or CSV with a header row"></textarea>
             <p><label for="bulk_file">…or upload a .json / .csv file</label>
                <input type="file" id="bulk_file" name="bulk_file" accept=".json,.csv,.txt"></p>
+            <div class="grid">
+                <div><label for="bulk-from_name">From Name (for all rows)</label><input id="bulk-from_name"></div>
+                <div><label for="bulk-from_role">From Role (for all rows)</label><input id="bulk-from_role"></div>
+            </div>
+            <div class="hint">Used for every row that has no <b>from_name</b> / <b>from_role</b> of its own. Empty = <b id="bulk-defaults"></b>.</div>
             <p>
                 <button class="btn" type="submit">Generate All</button>
                 <button class="btn light" type="button" onclick="fill('json')">Sample JSON</button>
@@ -173,15 +178,16 @@ document.getElementById('single-fields').innerHTML = Object.entries(FIELDS).map(
     `<div class="${k === 'image' ? 'full' : ''}">
         <label for="f-${esc(k)}">${esc(label)}${k === 'name' ? ' *' : ''}</label>
         <input id="f-${esc(k)}" name="${esc(k)}" ${k === 'name' ? 'required' : ''}>
-        ${k === 'leader' ? `<div class="hint">Leave empty to use <b>${esc(C.LEADER_NAME)}</b></div>` : ''}
-        ${k === 'leader_title' ? `<div class="hint">Leave empty to use <b>${esc(C.LEADER_TITLE)}</b></div>` : ''}
+        ${k === 'from_name' ? `<div class="hint">Who the greeting is from. Empty = <b>${esc(C.LEADER_NAME)}</b></div>` : ''}
+        ${k === 'from_role' ? `<div class="hint">Their role. Empty = <b>${esc(C.LEADER_TITLE)}</b></div>` : ''}
         ${k === 'image' ? '<div class="hint">Leave empty to auto-use a photo from the <b>images/</b> folder (e.g. <b>images/rahul_sharma.jpg</b> for "Rahul Sharma"). If none exists, initials are shown.</div>' : ''}
     </div>`).join('');
 document.getElementById('known-fields').textContent = Object.keys(FIELDS).join(', ');
+document.getElementById('bulk-defaults').textContent = C.LEADER_NAME + ' / ' + C.LEADER_TITLE;
 
 const SAMPLES = {
-    json: "[\n  {\"name\": \"Rahul Sharma\", \"department\": \"IT\", \"leader\": \"Ashish Chawan\", \"leader_title\": \"Team Leader\"},\n  {\"name\": \"Priya Patel\", \"department\": \"HR\", \"image\": \"https://example.com/priya.jpg\"}\n]",
-    csv: "name,department,leader,leader_title,image\nRahul Sharma,IT,Ashish Chawan,Team Leader,\nPriya Patel,HR,Neha Kapoor,HR Manager,https://example.com/priya.jpg",
+    json: "[\n  {\"name\": \"Rahul Sharma\", \"department\": \"IT\", \"from_name\": \"Ashish Chawan\", \"from_role\": \"Team Leader\"},\n  {\"name\": \"Priya Patel\", \"department\": \"HR\", \"from_name\": \"Neha Kapoor\", \"from_role\": \"HR Manager\", \"image\": \"https://example.com/priya.jpg\"}\n]",
+    csv: "name,department,from_name,from_role,image\nRahul Sharma,IT,Ashish Chawan,Team Leader,\nPriya Patel,HR,Neha Kapoor,HR Manager,https://example.com/priya.jpg",
 };
 function fill(t){ document.getElementById('bulk').value = SAMPLES[t]; }
 function showTab(tab){
@@ -291,6 +297,10 @@ document.getElementById('pane-bulk').addEventListener('submit', async e => {
     const ok = [], failed = [];
     for (let i = 0; i < rows.length; i++) {
         const data = buildRecord(rows[i]);
+        for (const k of ['from_name', 'from_role']) {
+            const all = document.getElementById('bulk-' + k).value.trim();
+            if (all && !data[k]) data[k] = all;
+        }
         if (!data.name) { failed.push({ row: i + 1, error: 'missing "name"' }); continue; }
         ok.push({ name: data.name, dept: data.department || '', url: await makeUrl(data) });
     }

@@ -8,7 +8,7 @@
     Open: index.html?t=<token>   (also works as  index.html#<token>  or  /<token>  on GitHub Pages / Apache)
   The token holds only name, department and image. Tokens are made by generate.html.
   All decoration is drawn in code, so no extra image files are needed.
-  Settings (leader name, message, secret key) are in config.js.
+  Settings (default From Name / From Role, message, secret key) are in config.js.
 -->
 <title>Diwali Greetings</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -462,8 +462,9 @@ if (!data) {
 var name = String(data.name);
 var first = name.trim().split(/\s+/)[0];
 var dept = data.department ? String(data.department) : '';
-var leader = data.leader ? String(data.leader) : C.LEADER_NAME;
-var leaderTitle = data.leader_title ? String(data.leader_title) : C.LEADER_TITLE;
+var fromRoleGiven = data.from_role || data.leader_title;   // leader / leader_title = older links
+var leader = String(data.from_name || data.leader || C.LEADER_NAME);
+var leaderTitle = String(fromRoleGiven || C.LEADER_TITLE);
 document.title = 'Happy Diwali, ' + first;
 
 /** Image: Image URL in token > images/{key}.jpg|jpeg|png|webp (first that loads) > initials. */
@@ -685,7 +686,7 @@ html += '<header class="head">' +
   '<svg class="sky" viewBox="0 0 1000 420" preserveAspectRatio="xMidYMin meet" fill="none" aria-hidden="true">' +
   burst(205, 112, 56, '#ff5cd0', 0) + burst(795, 106, 58, '#ff9c5c', -1.1) + burst(128, 56, 26, '#b98cff', -.6) + burst(872, 52, 26, '#7ec9ff', -1.7) +
   '</svg>' +
-  '<p><span class="ribbon from">A Message From Your ' + (data.leader_title ? h(leaderTitle) : 'Team Lead') + '</span></p>' +
+  '<p><span class="ribbon from">A Message From Your ' + (fromRoleGiven ? h(leaderTitle) : 'Team Lead') + '</span></p>' +
   '<p class="shubh" lang="hi">शुभ दीपावली</p>' +
   '<div class="title-row">' +
   '<svg viewBox="0 -8 100 98" aria-hidden="true">' + diya('translate(0 0)') + '</svg>' +
