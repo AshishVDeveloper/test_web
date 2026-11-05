@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--
+  index.html — reads a token and shows that employee's Diwali greeting page.
+    Open: index.html?t=<token>   (also works as  index.html#<token>  or  /<token>  on GitHub Pages / Apache)
+  The token holds only name, department and image. Tokens are made by generate.html.
+  All decoration is drawn in code, so no extra image files are needed.
+  Settings (leader name, message, secret key) are in config.js.
+-->
+<title>Diwali Greetings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playball&family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Lora:wght@400;500&family=Great+Vibes&family=Tiro+Devanagari+Hindi&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --plum-900: #1d0730;
+  --plum-800: #2d0b47;
+  --plum-700: #4a1060;
+  --wine: #6b0d4f;
+  --wine-deep: #3e0a3e;
+  --gold: #e9be69;
+  --gold-light: #ffe7a6;
+  --gold-deep: #b67c26;
+  --parchment: #fff4dc;
+  --parchment-deep: #f6dfb2;
+  --ink: #3a1140;
+  --rani: #9b0f5f;
+  --serif: "Playfair Display", Georgia, "Times New Roman", serif;
+  --script: "Playball", "Brush Script MT", "Playfair Display", cursive;
+  --sign: "Great Vibes", "Brush Script MT", cursive;
+  --text: "Lora", Georgia, serif;
+  --deva: "Tiro Devanagari Hindi", "Noto Serif Devanagari", serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+body {
+  background: var(--plum-900);
+  color: var(--parchment);
+  font-family: var(--text);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+.defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+#fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 30; }
+.poster {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 26% at 50% 12%, rgb(155 40 190 / .5), transparent 70%),
+    linear-gradient(180deg, #24093d 0, var(--plum-800) 26%, #3b0c4e 50%, var(--wine-deep) 72%, #2a0a35 100%);
+}
+
+/* Corner decoration */
+.corner {
+  position: absolute;
+  top: 0;
+  width: clamp(150px, 34vw, 430px);
+  height: auto;
+  overflow: visible;
+  z-index: 4;
+  pointer-events: none;
+}
+.corner.l { left: 0; }
+.corner.r { right: 0; transform: scaleX(-1); }
+.swing { transform-origin: 132px 20px; animation: swing 4.5s ease-in-out infinite alternate; }
+@keyframes swing { from { transform: rotate(-3.5deg); } to { transform: rotate(3.5deg); } }
+
+/* Ribbons */
+.ribbon {
+  position: relative;
+  display: inline-block;
+  padding: .32em 2.1em .38em;
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold-light), var(--gold-deep));
+  clip-path: polygon(1.1em 0, calc(100% - 1.1em) 0, 100% 50%, calc(100% - 1.1em) 100%, 1.1em 100%, 0 50%);
+  isolation: isolate;
+  color: var(--gold-light);
+  font-family: var(--serif);
+}
+.ribbon::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  z-index: -1;
+  background: linear-gradient(180deg, var(--wine), var(--wine-deep));
+  clip-path: inherit;
+}
+
+/* Header */
+.head {
+  position: relative;
+  text-align: center;
+  padding-top: clamp(20px, 3vw, 34px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.head > *:not(.sky) { position: relative; z-index: 2; }
+.from { font-size: clamp(.8125rem, 2.3vw, 1.5rem); max-width: 62vw; }
+.shubh {
+  margin: clamp(12px, 2vw, 22px) 0 0;
+  font-family: var(--deva);
+  font-size: clamp(1.125rem, 3vw, 1.75rem);
+  line-height: 1.4;
+  color: var(--gold);
+}
+.happy {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: clamp(1.75rem, 5.4vw, 3.75rem);
+  line-height: 1.05;
+  color: var(--gold-light);
+  text-shadow: 0 2px 10px rgb(255 190 80 / .4);
+}
+.title-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 clamp(4px, 2vw, 22px); }
+.title-row .happy { order: -1; flex-basis: 100%; }
+.title-row svg { width: clamp(38px, 7vw, 84px); height: auto; overflow: visible; flex: none; }
+.diwali {
+  margin: 0;
+  font-family: var(--script);
+  font-weight: 400;
+  font-size: clamp(4.25rem, 15vw, 10.5rem);
+  line-height: 1.02;
+  padding-inline: .1em;
+  background: linear-gradient(100deg, #b67c26 0, #ffe7a6 22%, #fff9df 34%, #e9be69 50%, #fff2bd 68%, #c78d2f 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 3px 2px rgb(70 20 0 / .8)) drop-shadow(0 0 22px rgb(255 190 80 / .4));
+  animation: shine 7s linear infinite alternate;
+}
+@keyframes shine { to { background-position: 100% 0; } }
+.fol { font-style: italic; font-size: clamp(.9375rem, 2.6vw, 1.625rem); }
+.sky { position: absolute; left: 0; right: 0; top: 0; bottom: 0; width: 100%; height: 100%; z-index: 0; }
+.city {
+  display: block;
+  width: 100%;
+  height: min(30vw, 480px);
+  margin-top: clamp(-90px, -5vw, -14px);
+  position: relative;
+  z-index: 1;
+  overflow: visible;
+}
+
+/* Hero: portrait + letter */
+.hero {
+  position: relative;
+  z-index: 3;
+  max-width: 1160px;
+  margin: clamp(-190px, -12vw, -20px) auto 0;
+  padding-left: max(16px, min(5vw, 64px), env(safe-area-inset-left, 0px));
+  padding-right: max(16px, min(5vw, 64px), env(safe-area-inset-right, 0px));
+  display: grid;
+  grid-template-columns: minmax(0, 9fr) minmax(0, 11fr);
+  gap: clamp(24px, 4vw, 44px);
+  align-items: center;
+}
+.arch-wrap { position: relative; width: 100%; max-width: 470px; justify-self: center; padding-bottom: 28px; }
+.arch { position: relative; aspect-ratio: 100 / 120; max-width: 100%; }
+.photo {
+  position: absolute;
+  inset: 0;
+  clip-path: url(#archClip);
+  background: radial-gradient(circle at 25% 25%, #ffb84a 0 3px, transparent 4px) 0 0 / 54px 54px,
+              radial-gradient(circle at 70% 60%, #ffcf7a 0 4px, transparent 5px) 0 0 / 68px 68px,
+              linear-gradient(180deg, #3a1450, #1d0730);
+}
+.photo img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 15%; }
+.initials {
+  width: 100%; height: 100%;
+  display: grid; place-items: center;
+  font-family: var(--serif);
+  font-size: clamp(4.5rem, 14vw, 8rem);
+  color: var(--gold-light);
+  text-shadow: 0 3px 16px rgb(255 180 70 / .7);
+}
+.arch-frame { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 12px rgb(255 190 80 / .6)); pointer-events: none; }
+.arch-flowers { position: absolute; left: -7%; right: -7%; bottom: 0; width: 114%; height: auto; overflow: visible; pointer-events: none; }
+.plate {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 94%;
+  text-align: center;
+  padding: .45em 2.2em .55em;
+  line-height: 1.2;
+  z-index: 2;
+}
+.plate strong { display: block; font-weight: 700; font-size: clamp(1.125rem, 2.3vw, 1.5rem); color: #fff4cf; overflow-wrap: anywhere; }
+.plate span { display: block; font-size: clamp(.75rem, 1.3vw, .875rem); font-style: italic; color: var(--gold-light); }
+
+.letter {
+  position: relative;
+  min-width: 0;
+  margin-top: 26px;
+  padding: 60px clamp(30px, 4vw, 46px) 48px;
+  color: var(--ink);
+  background: radial-gradient(ellipse at 50% 40%, #fffaf0, var(--parchment) 55%, var(--parchment-deep));
+  border: 2px solid var(--gold);
+  outline: 1px solid var(--gold-deep);
+  outline-offset: -9px;
+  border-radius: 30px;
+  box-shadow: 0 0 34px rgb(255 190 80 / .45), 0 18px 40px rgb(0 0 0 / .45);
+}
+.crest { position: absolute; top: -40px; left: 50%; width: 136px; height: auto; margin-left: -68px; overflow: visible; }
+.flourish { position: absolute; width: 44px; height: 44px; fill: none; stroke: var(--gold-deep); stroke-width: 1.4; }
+.flourish.tl { top: 14px; left: 14px; }
+.flourish.tr { top: 14px; right: 14px; transform: scaleX(-1); }
+.flourish.bl { bottom: 14px; left: 14px; transform: scaleY(-1); }
+.flourish.br { bottom: 14px; right: 14px; transform: scale(-1); }
+.letter h2 { margin: 0 0 12px; font-family: var(--serif); font-size: clamp(1.375rem, 2.6vw, 1.75rem); color: var(--rani); line-height: 1.2; }
+.letter p { margin: 0 0 12px; font-size: clamp(1rem, 1.6vw, 1.125rem); }
+.letter .wish { margin-bottom: 0; }
+.letter .wish strong { display: block; font-family: var(--serif); font-size: clamp(1.25rem, 2.4vw, 1.625rem); line-height: 1.25; color: var(--rani); }
+.sign { margin-top: 18px; display: grid; }
+.sign em { font-style: normal; font-size: .9375rem; }
+.sign strong { font-family: var(--sign); font-weight: 400; font-size: clamp(2rem, 3.6vw, 2.625rem); line-height: 1.15; color: #4c1762; }
+.sign span { font-size: .875rem; color: #6b4a6b; }
+
+/* Floor scene */
+.floor { display: block; position: relative; z-index: 2; width: 100%; max-width: 1400px; height: auto; margin-inline: auto; margin-top: clamp(-14px, -1vw, 0px); overflow: visible; }
+
+/* Blessings */
+.blessings {
+  position: relative;
+  z-index: 3;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 max(10px, env(safe-area-inset-right, 0px)) 0 max(10px, env(safe-area-inset-left, 0px));
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(2px, 2vw, 22px);
+}
+.blessings li { min-width: 0; display: grid; justify-items: center; gap: 6px; }
+.blessings svg { width: min(100%, 150px); height: auto; overflow: visible; }
+.blessings .ic { fill: none; stroke: #ffdf95; stroke-width: 1.3; stroke-linejoin: round; stroke-linecap: round; }
+.tag {
+  width: 100%;
+  max-width: 156px;
+  padding: .3em .55em .36em;
+  font-size: clamp(.625rem, 2.15vw, 1.125rem);
+  text-align: center;
+  clip-path: polygon(.6em 0, calc(100% - .6em) 0, 100% 50%, calc(100% - .6em) 100%, .6em 100%, 0 50%);
+}
+
+/* Closing */
+.closing {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  padding: clamp(24px, 4vw, 40px) max(16px, env(safe-area-inset-right, 0px)) clamp(32px, 5vw, 56px) max(16px, env(safe-area-inset-left, 0px));
+}
+.closing .ribbon { display: flex; align-items: center; gap: clamp(8px, 2vw, 20px); max-width: 860px; padding: .7em 2em; font-style: italic; font-size: clamp(.9375rem, 2.3vw, 1.5rem); line-height: 1.3; text-align: center; }
+.closing svg { width: clamp(30px, 5vw, 58px); height: auto; flex: none; overflow: visible; }
+.closing p { margin: 0; min-width: 0; }
+.mandala { position: absolute; bottom: -90px; width: clamp(140px, 24vw, 300px); height: auto; fill: none; stroke: #e0559e; stroke-width: 1.2; opacity: .38; }
+.mandala.l { left: -70px; }
+.mandala.r { right: -70px; }
+
+/* Live motion */
+.fl { transform-box: fill-box; transform-origin: 50% 100%; animation: flicker 1.3s ease-in-out infinite alternate; }
+@keyframes flicker {
+  0% { transform: scale(1, 1) skewX(-2deg); }
+  50% { transform: scale(.9, 1.1) skewX(2.5deg); }
+  100% { transform: scale(1.04, .94) skewX(-1deg); }
+}
+.gl { animation: pulse 1.9s ease-in-out infinite alternate; }
+@keyframes pulse { from { opacity: .72; } to { opacity: 1; } }
+.tw { animation: twinkle 2.8s ease-in-out infinite alternate; }
+@keyframes twinkle { from { opacity: .35; } to { opacity: 1; } }
+
+.notice { min-height: 100vh; display: grid; place-content: center; text-align: center; padding: 24px; }
+.notice h1 { margin: 8px 0; font-family: var(--serif); font-size: clamp(1.75rem, 5vw, 2.75rem); color: var(--gold-light); }
+
+/* Large desktop screens */
+@media (min-width: 1500px) {
+  .corner { width: clamp(430px, 28vw, 620px); }
+  .from { font-size: 1.75rem; }
+  .shubh { font-size: 2.125rem; }
+  .happy { font-size: 4.5rem; }
+  .diwali { font-size: 13rem; }
+  .title-row svg { width: 104px; }
+  .fol { font-size: 1.875rem; }
+  .hero { max-width: 1460px; }
+  .arch-wrap { max-width: 590px; }
+  .plate strong { font-size: 1.875rem; }
+  .plate span { font-size: 1.0625rem; }
+  .letter { padding: 72px 64px 58px; }
+  .letter h2 { font-size: 2.125rem; }
+  .letter p { font-size: 1.3125rem; }
+  .letter .wish strong { font-size: 2rem; }
+  .sign em { font-size: 1.125rem; }
+  .sign strong { font-size: 3.25rem; }
+  .sign span { font-size: 1.0625rem; }
+  .blessings { max-width: 1300px; }
+  .blessings svg { width: min(100%, 190px); }
+  .tag { max-width: 200px; font-size: 1.3125rem; }
+  .closing .ribbon { max-width: 1080px; font-size: 1.75rem; }
+}
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); margin-top: -8px; gap: 30px; }
+  .arch-wrap { max-width: 340px; }
+  .head { padding-top: 50px; }
+  .letter { margin-top: 30px; }
+  .flourish { width: 30px; height: 30px; }
+}
+/* One-screen mode for desktop and tablet: the poster is laid out at a fixed design size,
+   then scaled by script to fill the window exactly, so nothing needs scrolling. */
+html.fit, html.fit body { overflow: hidden; height: 100%; }
+html.fit .poster {
+  position: fixed;
+  left: 0; top: 0;
+  transform-origin: 0 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+html.fit .corner { width: 380px; }
+html.fit .head { padding: 14px 60px 0; }
+html.fit .head p { margin: 0; }
+html.fit .from { font-size: 20px; max-width: none; }
+html.fit .shubh { margin: 6px 0 0; font-size: 22px; line-height: 1.25; }
+html.fit .title-row { flex-wrap: nowrap; gap: 16px; }
+html.fit .title-row .happy { order: 0; flex-basis: auto; }
+html.fit .happy { font-size: 58px; }
+html.fit .diwali { font-size: 108px; line-height: 1; }
+html.fit .title-row svg { width: 70px; }
+html.fit .fol { font-size: 19px; }
+html.fit .sky { height: auto; aspect-ratio: 1000 / 420; bottom: auto; }
+html.fit .city { position: absolute; left: 0; top: 100px; height: 340px; margin: 0; }
+html.fit .hero {
+  width: 100%;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 60px;
+  grid-template-columns: 350px minmax(0, 1fr);
+  gap: 38px;
+}
+html.fit .arch-wrap { width: 350px; max-width: none; padding-bottom: 22px; }
+html.fit .plate strong { font-size: 21px; }
+html.fit .plate span { font-size: 13px; }
+html.fit .letter { margin-top: 14px; padding: 40px 42px 30px; border-radius: 26px; }
+html.fit .crest { top: -32px; width: 112px; margin-left: -56px; }
+html.fit .flourish { width: 30px; height: 30px; }
+html.fit .letter h2 { margin-bottom: 8px; font-size: 25px; }
+html.fit .letter p { margin-bottom: 8px; font-size: 17.5px; line-height: 1.45; }
+html.fit .letter .wish { margin-bottom: 0; }
+html.fit .letter .wish strong { font-size: 23px; }
+html.fit .sign { margin-top: 10px; }
+html.fit .sign em { font-size: 15px; }
+html.fit .sign strong { font-size: 36px; }
+html.fit .sign span { font-size: 14px; }
+html.fit .blessings { width: calc(100% - 340px); max-width: 1000px; padding: 0; gap: 16px; }
+html.fit .blessings li { gap: 2px; }
+html.fit .blessings svg { width: 112px; }
+html.fit .tag { max-width: 150px; font-size: 16px; }
+html.fit .closing { padding: 6px 60px 10px; }
+html.fit .closing .ribbon { max-width: 1000px; padding: 4px 34px; font-size: 19px; }
+html.fit .closing svg { width: 36px; }
+html.fit .mandala { width: 230px; }
+
+html.fit.land .floor {
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  width: min(100%, 1400px);
+  max-width: none;
+  margin: 0;
+  transform: translateX(-50%);
+}
+html.fit.land .floor-diyas { display: none; }
+html.fit.land .rangoli { transform: translate(500px, 168px) scale(.86, .25); }
+
+html.fit.tall .head { padding-top: 18px; }
+html.fit.tall .corner { width: 300px; }
+html.fit.tall .city { top: 100px; height: 300px; opacity: .6; }
+html.fit.tall .hero { padding: 0 44px; grid-template-columns: 320px minmax(0, 1fr); gap: 26px; }
+html.fit.tall .arch-wrap { width: 320px; }
+html.fit.tall .letter { padding: 42px 34px 42px; }
+html.fit.tall .closing { padding-inline: 30px; }
+html.fit.tall .closing .ribbon { font-size: 17px; padding-inline: 26px; }
+html.fit.tall .letter p { font-size: 16.5px; }
+html.fit.tall .floor { width: 100%; max-width: none; margin: 0; }
+html.fit.tall .blessings { width: calc(100% - 40px); }
+html.fit.tall .blessings svg { width: 104px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fl, .gl, .tw, .swing, .diwali { animation: none; }
+}
+</style>
+<script src="config.js"></script>
+<script src="token.js"></script>
+</head>
+<body>
+<script>
+(async function () {
+'use strict';
+var C = window.GREETING_CONFIG;
+
+/* ---------------- small helpers ---------------- */
+function h(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]; }); }
+function f1(n) { return (+n).toFixed(1); }              // like PHP %.1f
+function f2(n) { return (+n).toFixed(2); }              // like PHP %.2f
+function d(n) { return String(Math.trunc(n)); }         // like PHP %d
+function num(n) { return String(+(+n).toFixed(4)); }    // plain number
+
+/* Mersenne Twister — same numbers as PHP mt_srand()/mt_rand(), so the decoration looks identical */
+function MT(seed) {
+  var s = new Uint32Array(624), idx = 624;
+  s[0] = seed >>> 0;
+  for (var i = 1; i < 624; i++) { var p = s[i - 1] ^ (s[i - 1] >>> 30); s[i] = (Math.imul(1812433253, p) + i) >>> 0; }
+  function next() {
+    if (idx >= 624) {
+      for (var k = 0; k < 624; k++) {
+        var y = (s[k] & 0x80000000) | (s[(k + 1) % 624] & 0x7fffffff);
+        s[k] = s[(k + 397) % 624] ^ (y >>> 1) ^ ((y & 1) ? 0x9908b0df : 0);
+      }
+      idx = 0;
+    }
+    var v = s[idx++];
+    v ^= v >>> 11; v ^= (v << 7) & 0x9d2c5680; v ^= (v << 15) & 0xefc60000; v ^= v >>> 18;
+    return v >>> 0;
+  }
+  return function (min, max) {
+    var u = max - min + 1, r = next();
+    if ((u & (u - 1)) === 0) return min + (r & (u - 1));
+    var limit = 0xFFFFFFFF - (0xFFFFFFFF % u) - 1;
+    while (r > limit) r = next();
+    return min + (r % u);
+  };
+}
+
+/* ---------------- read the token ---------------- */
+function getToken() {
+  var q = new URLSearchParams(location.search).get('t');
+  if (q) return q.trim();
+  if (location.hash.length > 1) return decodeURIComponent(location.hash.slice(1)).trim();
+  var last = decodeURIComponent(location.pathname.split('/').pop() || '');
+  if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(last) && !/\.(html?|php)$/i.test(last)) return last;
+  return '';
+}
+var token = getToken();
+var data = token ? await GreetingToken.readToken(token, C) : null;
+
+if (!data) {
+  document.body.innerHTML =
+    '<main class="notice"><p class="shubh" lang="hi">शुभ दीपावली</p>' +
+    '<h1>' + (token === '' ? 'Please use your personal link' : 'This link is not valid') + '</h1>' +
+    '<p>Open the full link or scan the QR code again. If it still does not work, ask your team leader for a new one.</p></main>';
+  return;
+}
+
+var name = String(data.name);
+var first = name.trim().split(/\s+/)[0];
+var dept = data.department ? String(data.department) : '';
+document.title = 'Happy Diwali, ' + first;
+
+/** Image: Image URL in token > images/{key}.jpg|jpeg|png|webp (first that loads) > initials. */
+function imageCandidates() {
+  if (data.image) return [String(data.image)];
+  var key = name.replace(/\s+/g, '_').toLowerCase().trim().replace(/[^A-Za-z0-9_\-]/g, '');
+  if (!key) return [];
+  return ['jpg', 'jpeg', 'png', 'webp'].map(function (ext) { return C.IMAGE_PATTERN.replace('{key}', key).replace(/\.jpg$/, '.' + ext); });
+}
+function initials(n) {
+  var w = n.trim().split(/\s+/);
+  var i = (Array.from(w[0] || '')[0] || '') + (w.length > 1 ? (Array.from(w[w.length - 1])[0] || '') : '');
+  return (i || '?').toUpperCase();
+}
+
+/* ---------------- Drawing helpers: everything below returns SVG markup ---------------- */
+
+/** A marigold, rose or yellow flower. */
+function flower(x, y, r, kind) {
+  return '<use href="#m-' + (kind || 'o') + '" x="' + f1(x - r) + '" y="' + f1(y - r) + '" width="' + f1(r * 2) + '" height="' + f1(r * 2) + '"/>';
+}
+function leaf(x, y, s, rot) {
+  return '<use href="#leaf" transform="translate(' + f1(x) + ' ' + f1(y) + ') rotate(' + f1(rot) + ') scale(' + f2(s) + ')"/>';
+}
+
+/** A live diya in a 100-unit box: flame base at (50,42), bowl to y=84. icon is optional engraving. */
+var diyaCount = 0;
+function diya(transform, icon) {
+  diyaCount++;
+  var d1 = num(-(diyaCount * 0.37)), d2 = num(-(diyaCount * 0.53));
+  return '<g transform="' + transform + '">' +
+    '<circle class="gl" style="animation-delay:' + d2 + 's" cx="50" cy="26" r="44" fill="url(#g-glow)"/>' +
+    '<path d="M5 46C8 74 30 86 50 86C70 86 92 74 95 46Z" fill="url(#g-bowl)"/>' +
+    '<path d="M12 62C28 70 72 70 88 62" fill="none" stroke="#ffd98a" stroke-opacity=".45" stroke-width=".9"/>' +
+    '<path d="M26 82C40 87 60 87 74 82L70 88H30Z" fill="#6e2c0e"/>' +
+    (icon || '') +
+    '<ellipse cx="50" cy="46" rx="45" ry="7.5" fill="#f0b94f"/>' +
+    '<ellipse cx="50" cy="46.5" rx="41" ry="5.6" fill="url(#g-oil)"/>' +
+    '<path d="M49 46V40" stroke="#2b1208" stroke-width="2"/>' +
+    '<g class="fl" style="animation-delay:' + d1 + 's">' +
+    '<path d="M50 3C62 20 64 32 50 43C36 32 38 20 50 3Z" fill="url(#g-flame)"/>' +
+    '<path d="M50 20C56 29 56 36 50 42C44 36 44 29 50 20Z" fill="#fffbe6"/>' +
+    '</g></g>';
+}
+
+/** One corner of decoration: garland along the top, strand down the side, lantern and bell. */
+function corner() {
+  var rand = MT(11), o = '', x, y;
+  for (x = 8; x < 440; x += 30) {
+    o += leaf(x + 8, 34 + rand(0, 14), .62 + rand(0, 40) / 100, 170 + rand(-28, 28));
+  }
+  [34, 92, 150].forEach(function (yy) { o += leaf(42, yy, .6, -70); });
+  for (y = 40; y < 510; y += 25) {
+    if (y % 3 === 0) o += leaf(38, y, .55, -80 + rand(-30, 30));
+  }
+  for (y = 34; y < 520; y += 24) {
+    o += flower(16 + rand(-4, 4), y, 15 + rand(0, 4), y % 5 === 0 ? 'y' : 'o');
+  }
+  var kinds = ['o', 'o', 'y', 'o', 'r', 'o', 'y'];
+  for (x = 4; x < 430; x += 19) {
+    o += flower(x, 12 + rand(0, 10), 15 + rand(0, 6) - x / 60, kinds[rand(0, 6)]);
+  }
+  // Hanging strand with a bell
+  o += '<path d="M275 20V128" stroke="#d9a84e" stroke-width="1.6"/>';
+  for (y = 34; y <= 112; y += 13) { o += flower(275, y, 7.5, (y % 2) ? 'y' : 'o'); }
+  o += '<path d="M264 142C264 126 269 121 275 121C281 121 286 126 286 142L290 148H260Z" fill="url(#g-brass)"/><circle cx="275" cy="151" r="3.2" fill="#a86f1e"/>';
+  // Lantern
+  o += '<g class="swing">' +
+    '<path d="M132 20V82" stroke="#d9a84e" stroke-width="2"/>' +
+    '<path d="M116 100C116 88 124 82 132 82C140 82 148 88 148 100Z" fill="url(#g-brass)"/>' +
+    '<rect x="108" y="99" width="48" height="6" rx="2" fill="#a86f1e"/>' +
+    '<circle class="gl" cx="132" cy="136" r="56" fill="url(#g-glow)"/>' +
+    '<path d="M112 105H152L160 150L148 172H116L104 150Z" fill="url(#g-lamp)" stroke="#e9be69" stroke-width="2.4"/>' +
+    '<path d="M124 105L120 172M140 105L144 172M104 150H160" stroke="#b67c26" stroke-width="1.8" fill="none"/>' +
+    '<rect x="112" y="172" width="40" height="6" rx="2" fill="#a86f1e"/>' +
+    '<circle cx="132" cy="184" r="5" fill="url(#g-brass)"/>' +
+    '<path d="M125 190H139L143 232H121Z" fill="#b5122f"/>' +
+    '<path d="M128 192V230M132 192V232M136 192V230" stroke="#6e0b1d" stroke-width=".9"/>' +
+    '<rect x="123" y="188" width="18" height="4" fill="#e9be69"/>' +
+    '</g>';
+  return o;
+}
+
+/** A static firework that twinkles. */
+function burst(cx, cy, r, color, delay) {
+  var o = '<g class="tw" style="animation-delay:' + delay + 's">';
+  for (var i = 0; i < 28; i++) {
+    var a = Math.PI * 2 * i / 28, len = i % 2 ? r : r * .72;
+    var x1 = cx + Math.cos(a) * r * .18, y1 = cy + Math.sin(a) * r * .18;
+    var x2 = cx + Math.cos(a) * len, y2 = cy + Math.sin(a) * len;
+    o += '<path d="M' + f1(x1) + ' ' + f1(y1) + 'L' + f1(x2) + ' ' + f1(y2) + '" stroke="' + color + '" stroke-width="1.1" stroke-linecap="round"/><circle cx="' + f1(x2) + '" cy="' + f1(y2) + '" r="1.5" fill="#fff3c9"/>';
+  }
+  return o + '</g>';
+}
+
+/** A palace on the waterfront, with lit windows. w is its width. */
+function palace(x, base, w) {
+  var ht = w * .46, top = base - ht, o = '';
+  o += '<rect x="' + f1(x) + '" y="' + f1(top) + '" width="' + f1(w) + '" height="' + f1(ht) + '" fill="#3a1450"/>';
+  [[.5, .23], [.14, .12], [.86, .12]].forEach(function (pp) {
+    var px = pp[0], cx = x + w * px, r = w * pp[1], by = px === .5 ? top - w * .03 : top;
+    if (px === .5) o += '<rect x="' + f1(cx - r * .9) + '" y="' + f1(by) + '" width="' + f1(r * 1.8) + '" height="' + f1(w * .04) + '" fill="#44185a"/>';
+    o += '<path d="M' + f1(cx - r) + ' ' + f1(by) + 'C' + f1(cx - r * 1.05) + ' ' + f1(by - r * .9) + ' ' + f1(cx - r * .25) + ' ' + f1(by - r * 1.05) + ' ' + f1(cx) + ' ' + f1(by - r * 1.6) +
+      'C' + f1(cx + r * .25) + ' ' + f1(by - r * 1.05) + ' ' + f1(cx + r * 1.05) + ' ' + f1(by - r * .9) + ' ' + f1(cx + r) + ' ' + f1(by) + 'Z" fill="#5a2268"/>';
+  });
+  var rows = 3, cols = 11;
+  for (var r = 0; r < rows; r++) {
+    for (var c = 0; c < cols; c++) {
+      var wx = x + (c + .35) * w / cols, wy = top + (r + .22) * ht / rows;
+      o += '<rect class="' + ((r + c) % 3 ? '' : 'tw') + '" style="animation-delay:-' + f1((r * 3 + c) * .4) + 's" x="' + f1(wx) + '" y="' + f1(wy) + '" width="' + f1(w / cols * .24) + '" height="' + f1(ht / rows * .42) + '" rx="1" fill="#ffc768"/>';
+    }
+  }
+  return o;
+}
+
+function skyline() {
+  var rand = MT(4), o = '<g id="city">';
+  for (var x = 0; x < 1000; x += 34) {
+    var ht = 12 + rand(0, 22);
+    o += '<rect x="' + x + '" y="' + (150 - ht) + '" width="36" height="' + ht + '" fill="#2c0f42"/>';
+    if (x % 2 === 0) o += '<circle class="tw" style="animation-delay:-' + (x % 7) + '.3s" cx="' + (x + 14) + '" cy="' + (150 - ht + 7) + '" r="1.8" fill="#ffc768"/>';
+  }
+  o += palace(40, 150, 180) + palace(250, 150, 110) + palace(640, 150, 110) + palace(780, 150, 180);
+  return o + '</g>';
+}
+
+/** Rangoli: rings of petals, squashed in the scene so it lies on the floor. */
+function rangoli() {
+  var rings = [
+    [28, 226, 40, 22, '#1f8a55'], [24, 192, 52, 28, '#e4116f'], [20, 150, 50, 30, '#ff8c1a'],
+    [16, 110, 46, 28, '#7a1fa2'], [12, 72, 40, 25, '#ffc72e'], [10, 44, 28, 16, '#e4116f'],
+  ];
+  var o = '<circle r="244" fill="#6d0f5e" stroke="#ffcf6b" stroke-width="3"/><circle r="214" fill="#ffb238"/><circle r="172" fill="#8c1a7a"/><circle r="130" fill="#ffd45c"/><circle r="92" fill="#c0126a"/>';
+  rings.forEach(function (ring, k) {
+    var n = ring[0], rad = ring[1], len = ring[2], wd = ring[3], col = ring[4];
+    for (var i = 0; i < n; i++) {
+      var a = 360 / n * (i + (k % 2 ? .5 : 0));
+      o += '<path transform="rotate(' + f1(a) + ') translate(0 ' + d(-rad) + ')" d="M0 ' + f1(-len / 2 - 6) + 'C' + d(wd) + ' ' + f1(-len / 5) + ' ' + d(wd) + ' ' + f1(len / 3) + ' 0 ' + f1(len / 2) +
+        'C-' + d(wd) + ' ' + f1(len / 3) + ' -' + d(wd) + ' ' + f1(-len / 5) + ' 0 ' + f1(-len / 2 - 6) + 'Z" fill="' + col + '" stroke="#fff0c4" stroke-width="1"/>';
+    }
+  });
+  for (var i = 0; i < 40; i++) o += '<circle transform="rotate(' + (i * 9) + ')" cy="-228" r="4" fill="#fff0c4"/>';
+  return o + '<circle r="30" fill="#ffc72e" stroke="#e4116f" stroke-width="5"/>';
+}
+
+/** Brass urn with a flower bunch, standing on the floor at x. */
+function urn(x, base) {
+  var o = '<g transform="translate(' + f1(x) + ' ' + f1(base) + ')">';
+  o += '<path d="M-22 -92H22L28 -78C54 -62 58 -24 34 -8L26 0H-26L-34 -8C-58 -24 -54 -62 -28 -78Z" fill="url(#g-brass)"/>';
+  o += '<path d="M-46 -48C-20 -38 20 -38 46 -48M-44 -28C-20 -18 20 -18 44 -28" fill="none" stroke="#7a4a12" stroke-width="2.4"/>';
+  for (var i = 0; i < 9; i++) o += '<circle class="tw" style="animation-delay:-' + f1(i * .5) + 's" cx="' + (-36 + i * 9) + '" cy="-38" r="3.2" fill="#fff0b0"/>';
+  o += leaf(-30, -96, .9, -125) + leaf(30, -96, .9, 125) + leaf(0, -104, .8, 180);
+  o += flower(-20, -102, 17, 'o') + flower(20, -102, 17, 'y') + flower(0, -118, 19, 'r') + flower(0, -94, 16, 'o');
+  return o + '</g>';
+}
+
+/** Faint mandala for the bottom corners. */
+function mandala() {
+  var o = '';
+  [[24, 150, 34], [16, 104, 28], [12, 62, 22]].forEach(function (m) {
+    var n = m[0], r = m[1], l = m[2];
+    for (var i = 0; i < n; i++) {
+      o += '<path transform="rotate(' + f1(360 / n * i) + ') translate(0 ' + (-r) + ')" d="M0 ' + d(-l / 2) + 'C9 -4 9 4 0 ' + d(l / 2) + 'C-9 4 -9 -4 0 ' + d(-l / 2) + 'Z"/>';
+    }
+    o += '<circle r="' + (r + l / 2 + 4) + '"/>';
+  });
+  return o;
+}
+
+var ICONS = {
+  'Happiness':  '<path d="M50 56C44 62 44 70 50 77C56 70 56 62 50 56ZM41 62C37 67 39 73 47 77C43 72 42 67 41 62ZM59 62C63 67 61 73 53 77C57 72 58 67 59 62ZM33 66C32 72 38 77 46 78C40 75 36 71 33 66ZM67 66C68 72 62 77 54 78C60 75 64 71 67 66Z"/>',
+  'Prosperity': '<ellipse cx="50" cy="60" rx="10" ry="3.2"/><path d="M40 60V65C40 67 45 68 50 68C55 68 60 67 60 65V60"/><path d="M36 67V72C36 74 41 75 46 75C51 75 56 74 56 72V68"/><path d="M58 68V72C58 74 62 75 66 74C69 74 70 73 70 72V68C69 67 62 66 58 68Z"/>',
+  'Success':    '<path d="M41 56H59V63C59 69 55 72 50 72C45 72 41 69 41 63ZM41 58H35C35 64 38 66 42 66M59 58H65C65 64 62 66 58 66M50 72V76M43 79H57L55 76H45Z"/>',
+  'Health':     '<path d="M50 78C38 70 33 65 33 60C33 54 42 52 50 60C58 52 67 54 67 60C67 65 62 70 50 78Z"/><path d="M38 65H45L47 60L51 70L54 65H62"/>',
+  'Peace':      '<path d="M36 66C42 65 47 67 50 71C53 66 54 60 62 56C60 62 62 64 67 64C63 67 62 71 58 74C53 77 47 76 44 73L37 77L40 71C38 70 37 68 36 66Z"/><circle cx="62" cy="59" r=".6"/>',
+};
+
+/* ---------------- build the page ---------------- */
+var flowerSymbols = '';
+var FLOWER_COLORS = { o: ['#d96a00', '#f68d0d', '#ffae1f', '#ffc83c', '#a84c00'], y: ['#e69b00', '#ffbd14', '#ffd83d', '#ffe873', '#b87800'], r: ['#a80f54', '#d3196e', '#ef3f8c', '#ff7ab0', '#700835'] };
+Object.keys(FLOWER_COLORS).forEach(function (k) {
+  var c = FLOWER_COLORS[k];
+  flowerSymbols += '<symbol id="m-' + k + '" viewBox="-50 -50 100 100">';
+  [[14, 37, 12, 0], [12, 27, 11, 1], [10, 17, 9, 2], [7, 8, 6, 3]].forEach(function (q) {
+    for (var i = 0; i < q[0]; i++) {
+      flowerSymbols += '<ellipse transform="rotate(' + num(Math.round(360 / q[0] * (i + q[3] * .3) * 10) / 10) + ') translate(0 ' + (-q[1]) + ')" rx="' + q[2] + '" ry="' + (q[2] + 2) + '" fill="' + c[q[3]] + '" stroke="' + c[4] + '" stroke-width=".7"/>';
+    }
+  });
+  flowerSymbols += '</symbol>';
+});
+
+var cornerSvg = corner();
+var flourish = '<path d="M3 41C3 18 18 3 41 3M10 40C10 25 25 10 40 10M16 16C20 22 22 24 28 28M14 26C18 26 20 28 21 32M26 14C26 18 28 20 32 21"/>';
+var imgs = imageCandidates();
+var photo = imgs.length
+  ? '<img src="' + h(imgs[0]) + '" alt="Photo of ' + h(name) + '" data-i="0"><div class="initials" aria-hidden="true" hidden>' + h(initials(name)) + '</div>'
+  : '<div class="initials" aria-hidden="true">' + h(initials(name)) + '</div>';
+
+var html = '';
+html += '<svg class="defs" aria-hidden="true"><defs>' +
+  '<clipPath id="archClip" clipPathUnits="objectBoundingBox"><path d="M.02 1V.36C.02 .2 .3 .16 .5 0C.7 .16 .98 .2 .98 .36V1Z"/></clipPath>' +
+  '<radialGradient id="g-glow"><stop offset="0" stop-color="#ffcb6b" stop-opacity=".8"/><stop offset=".45" stop-color="#ff9a2e" stop-opacity=".25"/><stop offset="1" stop-color="#ff8a00" stop-opacity="0"/></radialGradient>' +
+  '<linearGradient id="g-flame" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8a14"/><stop offset=".55" stop-color="#ffc234"/><stop offset="1" stop-color="#fff0a8"/></linearGradient>' +
+  '<linearGradient id="g-bowl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7a3210"/><stop offset=".45" stop-color="#d0752b"/><stop offset=".6" stop-color="#e59a45"/><stop offset="1" stop-color="#6e2c0e"/></linearGradient>' +
+  '<linearGradient id="g-brass" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a5a1c"/><stop offset=".45" stop-color="#ffdf95"/><stop offset=".6" stop-color="#e9be69"/><stop offset="1" stop-color="#7a4a12"/></linearGradient>' +
+  '<radialGradient id="g-oil"><stop offset="0" stop-color="#ffd76b"/><stop offset="1" stop-color="#b8651b"/></radialGradient>' +
+  '<radialGradient id="g-lamp"><stop offset="0" stop-color="#fff5c2"/><stop offset=".55" stop-color="#ffc54f"/><stop offset="1" stop-color="#c26a14"/></radialGradient>' +
+  '<radialGradient id="g-floor" cx=".5" cy=".3" r=".75"><stop offset="0" stop-color="#7a1a5e" stop-opacity=".95"/><stop offset="1" stop-color="#2a0a35" stop-opacity="0"/></radialGradient>' +
+  '<linearGradient id="g-water" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f1460" stop-opacity=".9"/><stop offset="1" stop-color="#2d0b47" stop-opacity="0"/></linearGradient>' +
+  flowerSymbols +
+  '<g id="leaf"><path d="M0 0C-17 16 -16 46 0 70C16 46 17 16 0 0Z" fill="#2f7d3a"/><path d="M0 0C-9 18 -8 46 0 70Z" fill="#3f9a4a"/><path d="M0 2V66" stroke="#a7d66f" stroke-width="1"/></g>' +
+  '</defs></svg>';
+
+html += '<div class="poster">';
+html += '<svg class="corner l" viewBox="0 0 460 540" aria-hidden="true">' + cornerSvg + '</svg>';
+html += '<svg class="corner r" viewBox="0 0 460 540" aria-hidden="true">' + cornerSvg + '</svg>';
+
+html += '<header class="head">' +
+  '<svg class="sky" viewBox="0 0 1000 420" preserveAspectRatio="xMidYMin meet" fill="none" aria-hidden="true">' +
+  burst(205, 112, 56, '#ff5cd0', 0) + burst(795, 106, 58, '#ff9c5c', -1.1) + burst(128, 56, 26, '#b98cff', -.6) + burst(872, 52, 26, '#7ec9ff', -1.7) +
+  '</svg>' +
+  '<p><span class="ribbon from">A Message From Your Team Lead</span></p>' +
+  '<p class="shubh" lang="hi">शुभ दीपावली</p>' +
+  '<div class="title-row">' +
+  '<svg viewBox="0 -8 100 98" aria-hidden="true">' + diya('translate(0 0)') + '</svg>' +
+  '<p class="happy">Happy</p><h1 class="diwali">Diwali</h1>' +
+  '<svg viewBox="0 -8 100 98" aria-hidden="true">' + diya('translate(0 0)') + '</svg>' +
+  '</div>' +
+  '<p style="margin:6px 0 0"><span class="ribbon fol">Festival of Lights</span></p>' +
+  '</header>';
+
+html += '<svg class="city" viewBox="0 0 1000 300" preserveAspectRatio="xMidYMin slice" aria-hidden="true">' +
+  skyline() + '<rect y="150" width="1000" height="150" fill="url(#g-water)"/>' +
+  '<use href="#city" transform="matrix(1 0 0 -1 0 300)" opacity=".28"/></svg>';
+
+html += '<main class="hero"><div class="arch-wrap"><div class="arch">' +
+  '<div class="photo">' + photo + '</div>' +
+  '<svg class="arch-frame" viewBox="0 0 100 120" preserveAspectRatio="none" fill="none" aria-hidden="true">' +
+  '<path d="M2 120V43C2 24 30 19 50 0C70 19 98 24 98 43V120Z" stroke="url(#g-brass)" stroke-width="1.5"/>' +
+  '<path d="M-1 120V42C-1 21 28 17 50 -4C72 17 101 21 101 42V120" stroke="#e9be69" stroke-width=".5"/>' +
+  '<path d="M50 -11C53 -8 53 -5 50 -2C47 -5 47 -8 50 -11ZM44 -6C47 -6 48 -4 49 -2C46 -2 44 -3 44 -6ZM56 -6C53 -6 52 -4 51 -2C54 -2 56 -3 56 -6Z" fill="#ffe7a6"/>' +
+  '</svg></div>' +
+  '<svg class="arch-flowers" viewBox="0 0 114 26" aria-hidden="true"><g transform="scale(.26)">' +
+  leaf(40, 60, .7, 100) + leaf(90, 60, .7, -70) + leaf(355, 60, .7, 70) + leaf(405, 60, .7, -100) +
+  flower(22, 62, 19, 'o') + flower(56, 70, 22, 'y') + flower(92, 78, 18, 'o') + flower(30, 88, 17, 'r') +
+  flower(422, 62, 19, 'o') + flower(388, 70, 22, 'y') + flower(352, 78, 18, 'o') + flower(414, 88, 17, 'r') +
+  '</g></svg>' +
+  '<div class="ribbon plate"><strong>' + h(name) + '</strong>' + (dept !== '' ? '<span>' + h(dept) + '</span>' : '') + '</div>' +
+  '</div>';
+
+html += '<article class="letter">' +
+  '<svg class="crest" viewBox="0 0 136 70" aria-hidden="true">' +
+  '<path d="M2 56C30 54 50 44 68 8C86 44 106 54 134 56" fill="#fff4dc" stroke="#e9be69" stroke-width="2"/>' +
+  '<rect x="4" y="56" width="128" height="14" fill="#fff4dc"/>' + diya('translate(46 16) scale(.44)') + '</svg>' +
+  ['tl', 'tr', 'bl', 'br'].map(function (p) { return '<svg class="flourish ' + p + '" viewBox="0 0 44 44" aria-hidden="true">' + flourish + '</svg>'; }).join('') +
+  '<h2>Dear ' + h(first) + ',</h2>' +
+  C.MESSAGE.map(function (p) { return '<p>' + h(p) + '</p>'; }).join('') +
+  '<p class="wish">Wishing you and your family a very <strong>Happy and Prosperous Diwali!</strong></p>' +
+  '<div class="sign"><em>Warm regards,</em><strong>' + h(C.LEADER_NAME) + '</strong><span>' + h(C.LEADER_TITLE) + '</span></div>' +
+  '</article></main>';
+
+html += '<svg class="floor" viewBox="0 0 1000 250" aria-hidden="true">' +
+  '<ellipse cx="500" cy="130" rx="520" ry="130" fill="url(#g-floor)"/>' +
+  '<g class="rangoli" transform="translate(500 138) scale(1 .36)">' + rangoli() + '</g>' +
+  urn(58, 205) + urn(942, 205) +
+  flower(100, 210, 20, 'o') + flower(130, 222, 16, 'y') + flower(900, 210, 20, 'o') + flower(870, 222, 16, 'y') +
+  '<g class="floor-diyas">' +
+  [[298, 136], [700, 136], [203, 192], [795, 192], [500, 142]].map(function (p) { return '<ellipse cx="' + p[0] + '" cy="' + p[1] + '" rx="52" ry="9" fill="#ffb84a" opacity=".3"/>'; }).join('') +
+  diya('translate(262 72) scale(.72)') + diya('translate(664 72) scale(.72)') +
+  diya('translate(165 125) scale(.76)') + diya('translate(757 125) scale(.76)') +
+  diya('translate(432 22) scale(1.36)') +
+  '</g></svg>';
+
+html += '<ul class="blessings">' + Object.keys(ICONS).map(function (label) {
+  return '<li><svg viewBox="0 -8 100 98" aria-hidden="true">' + diya('translate(0 0)', '<g class="ic">' + ICONS[label] + '</g>') + '</svg><span class="ribbon tag">' + h(label) + '</span></li>';
+}).join('') + '</ul>';
+
+html += '<svg class="mandala l" viewBox="-200 -200 400 400" aria-hidden="true">' + mandala() + '</svg>';
+html += '<svg class="mandala r" viewBox="-200 -200 400 400" aria-hidden="true">' + mandala() + '</svg>';
+
+html += '<div class="closing"><div class="ribbon">' +
+  '<svg viewBox="0 -8 100 98" aria-hidden="true">' + diya('translate(0 0)') + '</svg>' +
+  '<p>May the divine light of Diwali fill your life with happiness, prosperity and success</p>' +
+  '<svg viewBox="0 -8 100 98" aria-hidden="true">' + diya('translate(0 0)') + '</svg>' +
+  '</div></div>';
+html += '</div><canvas id="fx" aria-hidden="true"></canvas>';
+
+document.body.innerHTML = html;
+
+/* Photo: try each candidate file in turn, then fall back to initials */
+var img = document.querySelector('.photo img');
+if (img) img.addEventListener('error', function () {
+  var i = +img.dataset.i + 1;
+  if (i < imgs.length) { img.dataset.i = i; img.src = imgs[i]; }
+  else { img.hidden = true; img.nextElementSibling.hidden = false; }
+});
+
+/* Fit the whole poster on one screen on desktop and tablet. Phones keep the normal scrolling page. */
+(function () {
+  var root = document.documentElement, poster = document.querySelector('.poster'), closing = document.querySelector('.closing');
+  function fit() {
+    var vw = window.innerWidth, vh = window.innerHeight;
+    if (vw < 700 || vh < 500) {
+      root.classList.remove('fit', 'land', 'tall');
+      poster.removeAttribute('style');
+      return;
+    }
+    var land = vw / vh >= 1.15, bw = land ? 1200 : 900, bh = land ? 900 : 1180;
+    root.classList.add('fit');
+    root.classList.toggle('land', land);
+    root.classList.toggle('tall', !land);
+    for (var pass = 0; pass < 4; pass++) {
+      var s = Math.min(vw / bw, vh / bh), w = vw / s, ht = vh / s;
+      poster.style.width = w + 'px';
+      poster.style.height = ht + 'px';
+      poster.style.transform = 'scale(' + s + ')';
+      var bottom = closing.offsetTop + closing.offsetHeight;
+      if (bottom <= ht + .5) break;
+      bh *= bottom / ht;   // content is taller than expected (e.g. a long name): zoom out a little
+    }
+  }
+  addEventListener('resize', fit);
+  fit();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+})();
+
+/* Fireworks: bursts over the title while it is on screen; a tap anywhere sets one off */
+(function () {
+  var c = document.getElementById('fx'), x = c.getContext('2d'), parts = [], last = 0, running = false;
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var colors = ['#ff5cd0', '#ffd45c', '#b98cff', '#ff8a3c', '#7ee0ff', '#fff3c9'];
+  function size() {
+    var r = Math.min(devicePixelRatio || 1, 2);
+    c.width = innerWidth * r; c.height = innerHeight * r;
+    x.setTransform(r, 0, 0, r, 0, 0);
+  }
+  addEventListener('resize', size); size();
+  function fire(px, py) {
+    var col = colors[Math.floor(Math.random() * colors.length)], n = 54 + Math.floor(Math.random() * 30), sp = 2 + Math.random() * 2;
+    for (var i = 0; i < n; i++) {
+      var a = Math.PI * 2 * i / n, v = sp * (.55 + Math.random() * .5);
+      parts.push({ x: px, y: py, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, col: i % 5 ? col : '#fff3c9' });
+    }
+    start();
+  }
+  function start() { if (!running) { running = true; requestAnimationFrame(frame); } }
+  function frame(ms) {
+    x.globalCompositeOperation = 'destination-out';
+    x.fillStyle = 'rgba(0,0,0,.2)';
+    x.fillRect(0, 0, innerWidth, innerHeight);
+    x.globalCompositeOperation = 'lighter';
+    parts = parts.filter(function (p) { return p.life > 0; });
+    parts.forEach(function (p) {
+      p.x += p.vx; p.y += p.vy; p.vy += .025; p.vx *= .985; p.vy *= .985; p.life -= .0115;
+      x.globalAlpha = Math.max(p.life, 0);
+      x.fillStyle = p.col;
+      x.beginPath(); x.arc(p.x, p.y, 1.5, 0, 6.3); x.fill();
+    });
+    x.globalAlpha = 1;
+    if (!reduce && ms - last > 1500 && scrollY < innerHeight * .45 && !document.hidden) {
+      last = ms;
+      var w = innerWidth, side = Math.random() < .5;
+      fire(w * (side ? .1 + Math.random() * .2 : .7 + Math.random() * .2), 50 + Math.random() * Math.min(190, innerHeight * .25) - scrollY);
+    }
+    if (parts.length || !reduce) requestAnimationFrame(frame);
+    else { running = false; x.clearRect(0, 0, innerWidth, innerHeight); }
+  }
+  document.addEventListener('click', function (e) { fire(e.clientX, e.clientY); });
+  if (!reduce) start();
+})();
+})();
+</script>
+</body>
+</html>

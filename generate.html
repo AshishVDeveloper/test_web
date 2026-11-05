@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  generate.html — ONLY creates Diwali greeting links + QR codes. Everything runs in the browser.
+    Single : fill the form
+    Bulk   : paste / upload JSON or CSV (many employees at once)
+  All information is stored INSIDE the token (no database):
+    token = base64url( deflate( JSON ) ) . "." . signature
+  The greeting page is index.html?t=<token>. Settings are in config.js.
+-->
+<title>Diwali Greeting Generator</title>
+<style>
+    :root { --bg:#f3f5f9; --card:#fff; --text:#1d2433; --muted:#6b7385; --accent:#2f6fed; --border:#e1e5ee; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { max-width: 900px; margin: 32px auto; padding: 0 16px; }
+    .box { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:24px; box-shadow:0 4px 18px rgba(0,0,0,.05); margin-bottom:20px; }
+    h1 { font-size:22px; margin:0 0 18px; }
+    label { display:block; font-size:13px; color:var(--muted); margin-bottom:4px; }
+    input, textarea { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:15px; font-family:inherit; }
+    textarea { font-family:monospace; font-size:13px; min-height:180px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .full { grid-column:1/-1; }
+    .row { display:flex; gap:8px; margin-bottom:8px; }
+    .btn { display:inline-block; background:var(--accent); color:#fff; border:0; border-radius:8px; padding:10px 18px; font-size:15px; cursor:pointer; text-decoration:none; }
+    .btn.light { background:#eef2fb; color:var(--accent); }
+    .btn.small { padding:6px 10px; font-size:13px; }
+    .hint { font-size:12px; color:var(--muted); margin-top:4px; }
+    .error { background:#fde8e8; color:#a12020; padding:10px 14px; border-radius:8px; margin-bottom:14px; }
+    .tabs { display:flex; gap:8px; margin-bottom:18px; }
+    .tabs button { background:#eef2fb; color:var(--accent); border:0; border-radius:8px; padding:9px 16px; font-size:14px; cursor:pointer; }
+    .tabs button.on { background:var(--accent); color:#fff; }
+    .pane { display:none; } .pane.on { display:block; }
+    pre { background:#f6f8fc; border:1px solid var(--border); border-radius:8px; padding:10px; font-size:12px; overflow:auto; }
+    .results { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:14px; }
+    .item { border:1px solid var(--border); border-radius:10px; padding:12px; text-align:center; }
+    .item b { display:block; margin-bottom:8px; }
+    .item .qr { display:inline-block; }
+    .item a.link { display:block; font-size:11px; word-break:break-all; color:var(--muted); margin:8px 0; max-height:3.2em; overflow:hidden; }
+    .single { text-align:center; }
+    .single .qr { display:inline-block; padding:12px; border:1px solid var(--border); border-radius:10px; margin:16px 0; }
+    .url { word-break:break-all; background:#f6f8fc; border:1px dashed var(--border); padding:10px; border-radius:8px; font-family:monospace; font-size:13px; }
+    @media (max-width:560px){ .grid{grid-template-columns:1fr;} }
+
+    /* ---- print settings + preview ---- */
+    select { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:15px; background:#fff; }
+    .pgrid { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; }
+    .pgrid label input[type=checkbox] { width:auto; }
+    .checks { display:flex; flex-wrap:wrap; gap:18px; margin:14px 0 6px; }
+    .checks label { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--text); margin:0; }
+    .checks input { width:auto; }
+    .pinfo { background:#f6f8fc; border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:14px; margin-top:10px; }
+    .pinfo.warn { background:#fff6e5; border-color:#f3d28b; }
+    #preview { display:flex; flex-wrap:wrap; gap:16px; margin-top:16px; padding:16px; background:#e9ecf3; border-radius:10px; justify-content:center; }
+    #preview .sheet { box-shadow:0 2px 10px rgba(0,0,0,.18); }
+    #preview .more { align-self:center; color:var(--muted); font-size:14px; }
+    #sheets { display:none; }
+    .sheet { background:#fff; color:#000; box-sizing:border-box; overflow:hidden; display:grid; align-content:start; justify-content:center; }
+    .cell { box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; text-align:center; font-family:Arial, sans-serif; }
+    .cell.cut { outline:0.2mm dashed #999; outline-offset:-0.1mm; }
+    .cell img { display:block; }
+    .cell .n { font-weight:700; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+    .cell .d { color:#444; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+    .cell .u { color:#555; line-height:1.2; word-break:break-all; overflow:hidden; max-width:100%; }
+    @media (max-width:760px){ .pgrid{grid-template-columns:1fr 1fr;} }
+    @media print {
+        body { background:#fff; margin:0; }
+        body > *:not(#sheets) { display:none !important; }
+        #sheets { display:block; }
+        .sheet { break-after:page; page-break-after:always; }
+        .sheet:last-child { break-after:auto; page-break-after:auto; }
+    }
+</style>
+<script src="config.js"></script>
+<script src="token.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+    <!-- ===== results (single or bulk) ===== -->
+    <div id="results-view" hidden></div>
+
+    <!-- ===== forms ===== -->
+    <div class="box" id="form-view">
+        <h1>Generate Diwali Greeting</h1>
+        <div class="tabs">
+            <button type="button" data-tab="single" class="on">Single</button>
+            <button type="button" data-tab="bulk">Bulk (JSON / CSV)</button>
+        </div>
+        <div class="error" id="form-error" hidden></div>
+
+        <!-- Single -->
+        <form class="pane on" id="pane-single">
+            <div class="grid" id="single-fields"></div>
+            <p><button class="btn" type="submit">Generate Link &amp; QR</button></p>
+        </form>
+
+        <!-- Bulk -->
+        <form class="pane" id="pane-bulk">
+            <label for="bulk">Paste JSON or CSV</label>
+            <textarea id="bulk" name="bulk" placeholder="Paste JSON array or CSV with a header row"></textarea>
+            <p><label for="bulk_file">…or upload a .json / .csv file</label>
+               <input type="file" id="bulk_file" name="bulk_file" accept=".json,.csv,.txt"></p>
+            <p>
+                <button class="btn" type="submit">Generate All</button>
+                <button class="btn light" type="button" onclick="fill('json')">Sample JSON</button>
+                <button class="btn light" type="button" onclick="fill('csv')">Sample CSV</button>
+            </p>
+            <div class="hint">
+                Required column/key: <b>name</b> (also accepts "emp name", "employee name").
+                Known: <b id="known-fields"></b>. Any other column is ignored.
+            </div>
+        </form>
+    </div>
+
+    <!-- ===== print settings ===== -->
+    <div class="box" id="printbox" hidden>
+        <h1>Print QR Sheet</h1>
+        <div class="pgrid">
+            <div><label for="p-paper">Paper size</label>
+                <select id="p-paper">
+                    <option value="A4">A4 (210 × 297 mm)</option>
+                    <option value="Letter">Letter (8.5 × 11 in)</option>
+                    <option value="Legal">Legal (8.5 × 14 in)</option>
+                    <option value="A3">A3 (297 × 420 mm)</option>
+                    <option value="A5">A5 (148 × 210 mm)</option>
+                    <option value="Custom">Custom…</option>
+                </select></div>
+            <div><label for="p-orient">Orientation</label>
+                <select id="p-orient"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></div>
+            <div class="p-custom"><label for="p-cw">Custom width (mm)</label><input type="number" id="p-cw" value="100" min="30" max="1000"></div>
+            <div class="p-custom"><label for="p-ch">Custom height (mm)</label><input type="number" id="p-ch" value="150" min="30" max="1000"></div>
+
+            <div><label for="p-mode">Layout by</label>
+                <select id="p-mode"><option value="count">QR count per page</option><option value="size">QR size (mm)</option></select></div>
+            <div class="p-count"><label for="p-cols">Columns</label><input type="number" id="p-cols" value="3" min="1" max="20"></div>
+            <div class="p-count"><label for="p-rows">Rows</label><input type="number" id="p-rows" value="4" min="1" max="30"></div>
+            <div class="p-size"><label for="p-qr">QR size (mm)</label><input type="number" id="p-qr" value="50" min="10" max="400"></div>
+
+            <div><label for="p-margin">Page margin (mm)</label><input type="number" id="p-margin" value="10" min="0" max="50"></div>
+            <div><label for="p-gap">Gap between (mm)</label><input type="number" id="p-gap" value="4" min="0" max="50"></div>
+            <div><label for="p-copies">Copies of each QR</label><input type="number" id="p-copies" value="1" min="1" max="500"></div>
+            <div><label for="p-fill"><input type="checkbox" id="p-fill"> Fill whole page</label>
+                <div class="hint">Repeat until the last page is full</div></div>
+        </div>
+        <div class="checks">
+            <label><input type="checkbox" id="p-name" checked> Name</label>
+            <label><input type="checkbox" id="p-dept" checked> Department</label>
+            <label><input type="checkbox" id="p-url"> URL text</label>
+            <label><input type="checkbox" id="p-cut" checked> Cut lines</label>
+        </div>
+        <div id="pinfo" class="pinfo"></div>
+        <p><button class="btn" onclick="doPrint()">🖨 Print</button></p>
+        <div class="hint">In the print dialog keep <b>Scale = 100%</b> (Default) and <b>Margins = Default / None</b>. Paper size is set automatically.</div>
+        <div id="preview"></div>
+    </div>
+
+</div>
+<div id="sheets"></div>
+
+<script>
+const C = window.GREETING_CONFIG;
+const FIELDS = C.FIELDS, ALIASES = C.ALIASES;
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+
+/* ---------------- form setup ---------------- */
+document.getElementById('single-fields').innerHTML = Object.entries(FIELDS).map(([k, label]) =>
+    `<div class="${k === 'image' ? 'full' : ''}">
+        <label for="f-${esc(k)}">${esc(label)}${k === 'name' ? ' *' : ''}</label>
+        <input id="f-${esc(k)}" name="${esc(k)}" ${k === 'name' ? 'required' : ''}>
+        ${k === 'image' ? '<div class="hint">Leave empty to auto-use a photo from the <b>images/</b> folder (e.g. <b>images/rahul_sharma.jpg</b> for "Rahul Sharma"). If none exists, initials are shown.</div>' : ''}
+    </div>`).join('');
+document.getElementById('known-fields').textContent = Object.keys(FIELDS).join(', ');
+
+const SAMPLES = {
+    json: "[\n  {\"name\": \"Rahul Sharma\", \"department\": \"IT\"},\n  {\"name\": \"Priya Patel\", \"department\": \"HR\", \"image\": \"https://example.com/priya.jpg\"}\n]",
+    csv: "name,department,image\nRahul Sharma,IT,\nPriya Patel,HR,https://example.com/priya.jpg",
+};
+function fill(t){ document.getElementById('bulk').value = SAMPLES[t]; }
+function showTab(tab){
+    document.querySelectorAll('.tabs button, .pane').forEach(e => e.classList.remove('on'));
+    document.querySelector(`.tabs button[data-tab="${tab}"]`).classList.add('on');
+    document.getElementById('pane-' + tab).classList.add('on');
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+function showError(msg){ const e = document.getElementById('form-error'); e.textContent = msg; e.hidden = !msg; }
+
+/* ---------------- tokens + links ---------------- */
+function baseUrl(){
+    if (C.BASE_URL) return C.BASE_URL.replace(/\/?$/, '/');
+    return new URL('./', location.href).href;
+}
+async function makeUrl(data){
+    const token = await GreetingToken.makeToken(data, C);
+    if (C.LINK_STYLE === 'path') return baseUrl() + token;
+    const page = (!C.BASE_URL && location.protocol === 'file:') ? 'index.html' : '';
+    return baseUrl() + page + '?t=' + token;
+}
+
+/** One row (from form, JSON or CSV) -> token data. Columns not listed in FIELDS are ignored, which keeps links and QR codes short. */
+function buildRecord(row){
+    const data = {};
+    for (let [key, val] of Object.entries(row)) {
+        if (Array.isArray(val)) val = val.join(' | ');
+        if (val === null || val === undefined || val === false) val = '';
+        if (val === true) val = '1';
+        if (typeof val === 'object') continue;
+        val = String(val).trim();
+        key = String(key).trim();
+        if (val === '' || key === '') continue;
+        let norm = key.toLowerCase();
+        norm = ALIASES[norm] || norm;
+        if (Object.prototype.hasOwnProperty.call(FIELDS, norm)) data[norm] = val;
+    }
+    return data;
+}
+
+/** CSV line reader (quotes with "" inside, like PHP fgetcsv). Returns rows of cells. */
+function parseCsv(text, delim){
+    const rows = []; let row = [], cell = '', q = false, i = 0, started = false;
+    for (; i < text.length; i++) {
+        const ch = text[i];
+        if (q) {
+            if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+            else cell += ch;
+        } else if (ch === '"') { q = true; started = true; }
+        else if (ch === delim) { row.push(cell); cell = ''; started = true; }
+        else if (ch === '\n' || ch === '\r') {
+            if (ch === '\r' && text[i + 1] === '\n') i++;
+            row.push(cell); rows.push(row); row = []; cell = ''; started = false;
+        } else { cell += ch; started = true; }
+    }
+    if (started || cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+}
+
+/** Parse pasted/uploaded text as JSON (array of objects, or one object) or CSV (first row = headers). */
+function parseBulk(text){
+    text = text.replace(/^﻿/, '').trim();   // strip UTF-8 BOM
+    if (text === '') return { error: 'No data given.', rows: [] };
+
+    if (text[0] === '[' || text[0] === '{') {
+        let json;
+        try { json = JSON.parse(text); } catch (e) { return { error: 'Invalid JSON: ' + e.message, rows: [] }; }
+        if (!Array.isArray(json)) json = [json];
+        return { error: '', rows: json.filter(r => r && typeof r === 'object') };
+    }
+
+    // CSV (comma, semicolon or tab separated — detected from the header line)
+    const first = text.split('\n')[0];
+    let delim = ',';
+    for (const d of ['\t', ';']) if (first.split(d).length > first.split(delim).length) delim = d;
+
+    const lines = parseCsv(text, delim);
+    const headers = lines.shift() || [];
+    const rows = [];
+    for (const line of lines) {
+        if (line.length === 1 && line[0] === '') continue;           // blank line
+        const r = {};
+        headers.forEach((hd, i) => { r[hd] = line[i] !== undefined ? line[i] : ''; });
+        rows.push(r);
+    }
+    return { error: rows.length ? '' : 'CSV needs a header row and at least one data row.', rows };
+}
+
+/* ---------------- handle submit ---------------- */
+let ITEMS = [];
+
+document.getElementById('pane-single').addEventListener('submit', async e => {
+    e.preventDefault();
+    const row = {};
+    for (const k of Object.keys(FIELDS)) row[k] = document.getElementById('f-' + k).value;
+    const data = buildRecord(row);
+    if (!data.name) return showError('Employee Name is required.');
+    showResults('single', [{ name: data.name, dept: data.department || '', url: await makeUrl(data) }], []);
+});
+
+document.getElementById('pane-bulk').addEventListener('submit', async e => {
+    e.preventDefault();
+    let text = document.getElementById('bulk').value;
+    const file = document.getElementById('bulk_file').files[0];
+    if (file) text = await file.text();
+    const { error, rows } = parseBulk(text);
+    const ok = [], failed = [];
+    for (let i = 0; i < rows.length; i++) {
+        const data = buildRecord(rows[i]);
+        if (!data.name) { failed.push({ row: i + 1, error: 'missing "name"' }); continue; }
+        ok.push({ name: data.name, dept: data.department || '', url: await makeUrl(data) });
+    }
+    if (!ok.length && !failed.length) return showError(error);
+    showResults('bulk', ok, failed);
+});
+
+function startOver(){
+    document.getElementById('results-view').hidden = true;
+    document.getElementById('results-view').innerHTML = '';
+    document.getElementById('printbox').hidden = true;
+    document.getElementById('sheets').innerHTML = '';
+    document.getElementById('form-view').hidden = false;
+    document.querySelectorAll('#form-view form').forEach(f => f.reset());
+    showError(''); showTab('single'); ITEMS = [];
+    scrollTo(0, 0);
+}
+
+function showResults(tab, ok, failed){
+    ITEMS = ok;
+    const view = document.getElementById('results-view');
+    let html;
+    if (ok.length === 1 && tab === 'single') {
+        const r = ok[0];
+        html = `<div class="box single">
+            <h1>Greeting link ready for ${esc(r.name)}</h1>
+            <div class="url">${esc(r.url)}</div>
+            <div class="qr" data-url="${esc(r.url)}" data-name="${esc(r.name)}" data-size="240"></div>
+            <p>
+                <a class="btn" href="${esc(r.url)}" target="_blank">Open Greeting</a>
+                <button class="btn light" onclick="copyText(ITEMS[0].url)">Copy URL</button>
+                <button class="btn light" onclick="downloadQR(document.querySelector('.qr'))">Download QR</button>
+                <a class="btn light" href="#printbox">Print…</a>
+                <button class="btn light" onclick="startOver()">New</button>
+            </p>
+        </div>`;
+    } else {
+        html = `<div class="box">
+            <h1>${ok.length} greeting link(s) generated${failed.length ? ', ' + failed.length + ' skipped' : ''}</h1>
+            ${failed.map(f => `<div class="error">Row ${f.row}: ${esc(f.error)}</div>`).join('')}
+            <p>
+                <button class="btn" onclick="downloadZip()">Download all QR (ZIP)</button>
+                <button class="btn light" onclick="downloadCsv()">Download URLs (CSV)</button>
+                ${ok.length ? '<a class="btn light" href="#printbox">Print…</a>' : ''}
+                <button class="btn light" onclick="startOver()">New</button>
+            </p>
+            <div class="results">
+                ${ok.map((r, i) => `<div class="item">
+                    <b>${esc(r.name)}</b>
+                    <div class="qr" data-url="${esc(r.url)}" data-name="${esc(r.name)}" data-size="150"></div>
+                    <a class="link" href="${esc(r.url)}" target="_blank">${esc(r.url)}</a>
+                    <button class="btn light small" onclick="downloadQR(this.parentNode.querySelector('.qr'))">QR</button>
+                    <button class="btn light small" onclick="copyText(ITEMS[${i}].url)">Copy</button>
+                </div>`).join('')}
+            </div>
+        </div>`;
+    }
+    view.innerHTML = html;
+    view.hidden = false;
+    document.getElementById('form-view').hidden = true;
+
+    view.querySelectorAll('.qr').forEach(el => {
+        const s = +el.dataset.size;
+        try { new QRCode(el, { text: el.dataset.url, width: s, height: s, correctLevel: QRCode.CorrectLevel.M }); }
+        catch (e) { el.textContent = 'Too long for a QR code. Use a shorter image URL.'; }
+    });
+    document.getElementById('printbox').hidden = !ok.length;
+    if (ok.length) renderPrint();
+    scrollTo(0, 0);
+}
+
+const fileName = n => 'qr_' + n.replace(/\W+/g, '_') + '.png';
+function save(href, name){ const a = document.createElement('a'); a.href = href; a.download = name; a.click(); }
+function downloadQR(el){ if (!el.querySelector('canvas')) return alert('No QR code: use a shorter image URL first.'); save(el.querySelector('canvas').toDataURL('image/png'), fileName(el.dataset.name)); }
+function copyText(t){
+    const done = () => alert('URL copied');
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t).then(done);
+    const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove(); done();
+}
+function downloadCsv(){
+    const q = v => '"' + String(v).replace(/"/g, '""') + '"';
+    const csv = 'name,url\n' + ITEMS.map(i => q(i.name) + ',' + q(i.url)).join('\n');
+    save(URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })), 'employee_urls.csv');
+}
+async function downloadZip(){
+    const zip = new JSZip(), used = {};
+    document.querySelectorAll('.qr').forEach(el => {
+        if (!el.querySelector('canvas')) return;
+        let n = fileName(el.dataset.name);
+        if (used[n]) n = n.replace('.png', '_' + (++used[n]) + '.png'); else used[n] = 1;
+        zip.file(n, el.querySelector('canvas').toDataURL('image/png').split(',')[1], { base64: true });
+    });
+    zip.file('employee_urls.csv', 'name,url\n' + ITEMS.map(i => '"' + i.name.replace(/"/g,'""') + '","' + i.url + '"').join('\n'));
+    save(URL.createObjectURL(await zip.generateAsync({ type: 'blob' })), 'employee_qr_codes.zip');
+}
+
+/* ================= PRINT SHEET ================= */
+const PAPERS = { A4:[210,297], Letter:[215.9,279.4], Legal:[215.9,355.6], A3:[297,420], A5:[148,210] };
+const P_KEYS = ['paper','orient','cw','ch','mode','cols','rows','qr','margin','gap','copies','fill','name','dept','url','cut'];
+const PAD = 1.5;                       // mm inside each cell
+const $p = k => document.getElementById('p-' + k);
+const hiRes = {};
+function hiQR(url){                    // high-resolution QR image for sharp printing
+    if (!hiRes[url]) {
+        const d = document.createElement('div');
+        try {
+            new QRCode(d, { text: url, width: 600, height: 600, correctLevel: QRCode.CorrectLevel.M });
+            hiRes[url] = d.querySelector('canvas').toDataURL('image/png');
+        } catch (e) { hiRes[url] = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='; }
+    }
+    return hiRes[url];
+}
+
+function readSettings(){
+    const s = {};
+    P_KEYS.forEach(k => { const el = $p(k); s[k] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? Math.max(0, parseFloat(el.value) || 0) : el.value); });
+    s.cols = Math.max(1, Math.round(s.cols)); s.rows = Math.max(1, Math.round(s.rows)); s.copies = Math.max(1, Math.round(s.copies));
+    return s;
+}
+
+function layout(s){
+    let [W, H] = s.paper === 'Custom' ? [s.cw || 100, s.ch || 150] : PAPERS[s.paper];
+    [W, H] = s.orient === 'landscape' ? [Math.max(W, H), Math.min(W, H)] : [Math.min(W, H), Math.max(W, H)];
+    const aw = W - 2 * s.margin, ah = H - 2 * s.margin;
+    const anyText = s.name || s.dept || s.url;
+    const label = q => {
+        const f = Math.min(5, Math.max(2, q * 0.08));          // name font (mm) scales with QR
+        return { f, h: (s.name ? f * 1.25 : 0) + (s.dept ? f * 0.8 * 1.25 : 0) + (s.url ? 1.5 * 1.2 * 2 : 0) + (anyText ? 1 : 0) };
+    };
+    let cols, rows, cw, ch, q, L;
+    if (s.mode === 'count') {
+        cols = s.cols; rows = s.rows;
+        cw = (aw - (cols - 1) * s.gap) / cols;
+        ch = (ah - (rows - 1) * s.gap) / rows;
+        q = Math.min(cw, ch) - 2 * PAD;
+        for (let i = 0; i < 3; i++) { L = label(q); q = Math.min(cw - 2 * PAD, ch - 2 * PAD - L.h); }
+    } else {
+        q = s.qr; L = label(q);
+        cw = q + 2 * PAD; ch = q + 2 * PAD + L.h;
+        cols = Math.floor((aw + s.gap) / (cw + s.gap));
+        rows = Math.floor((ah + s.gap) / (ch + s.gap));
+    }
+    L = label(q);
+    return { W, H, cols, rows, cw, ch, q, L, ok: q >= 8 && cols >= 1 && rows >= 1 };
+}
+
+function cellHtml(it, s, g){
+    let h = `<div class="cell${s.cut ? ' cut' : ''}" style="width:${g.cw}mm;height:${g.ch}mm;padding:${PAD}mm">`
+          + `<img src="${hiQR(it.url)}" style="width:${g.q}mm;height:${g.q}mm" alt="">`;
+    if (s.name || s.dept || s.url) h += `<div style="height:1mm"></div>`;
+    if (s.name) h += `<div class="n" style="font-size:${g.L.f}mm">${esc(it.name)}</div>`;
+    if (s.dept && it.dept) h += `<div class="d" style="font-size:${g.L.f * 0.8}mm">${esc(it.dept)}</div>`;
+    if (s.url) h += `<div class="u" style="font-size:1.5mm;max-height:3.6mm">${esc(it.url)}</div>`;
+    return h + '</div>';
+}
+
+function renderPrint(){
+    const s = readSettings();
+    try { localStorage.setItem('qrPrintSettings', JSON.stringify(s)); } catch (e) {}
+    document.querySelectorAll('.p-custom').forEach(e => e.style.display = s.paper === 'Custom' ? '' : 'none');
+    document.querySelectorAll('.p-count').forEach(e => e.style.display = s.mode === 'count' ? '' : 'none');
+    document.querySelectorAll('.p-size').forEach(e => e.style.display = s.mode === 'size' ? '' : 'none');
+
+    const g = layout(s), info = document.getElementById('pinfo');
+    if (!g.ok) {
+        info.className = 'pinfo warn';
+        info.textContent = "Doesn't fit on this paper — reduce columns/rows, QR size, margin or gap.";
+        document.getElementById('preview').innerHTML = document.getElementById('sheets').innerHTML = '';
+        return false;
+    }
+    const per = g.cols * g.rows;
+    let list = [];
+    ITEMS.forEach(it => { for (let i = 0; i < s.copies; i++) list.push(it); });
+    if (s.fill && list.length % per) { const base = list.slice(); let i = 0; while (list.length % per) list.push(base[i++ % base.length]); }
+    const pages = Math.ceil(list.length / per);
+
+    info.className = 'pinfo';
+    info.innerHTML = `<b>${per}</b> QR per page (${g.cols} × ${g.rows}) &nbsp;·&nbsp; QR size <b>${g.q.toFixed(1)} mm</b>`
+        + ` &nbsp;·&nbsp; ${list.length} QR → <b>${pages}</b> page(s) &nbsp;·&nbsp; Paper ${+g.W.toFixed(1)} × ${+g.H.toFixed(1)} mm`;
+
+    const sheetStyle = `width:${g.W}mm;height:${g.H - 0.3}mm;padding:${s.margin}mm;gap:${s.gap}mm;`
+                     + `grid-template-columns:repeat(${g.cols},${g.cw}mm);grid-auto-rows:${g.ch}mm;`;
+    const sheets = [];
+    for (let p = 0; p < pages; p++)
+        sheets.push(`<div class="sheet" style="${sheetStyle}">` + list.slice(p * per, (p + 1) * per).map(it => cellHtml(it, s, g)).join('') + '</div>');
+
+    document.getElementById('sheets').innerHTML = sheets.join('');
+    const zoom = Math.min(1, 300 / (g.W * 3.7795));             // preview ≈ 300px wide per page
+    document.getElementById('preview').innerHTML =
+        sheets.slice(0, 4).map(h => h.replace('style="', `style="zoom:${zoom};`)).join('')
+        + (pages > 4 ? `<div class="more">+ ${pages - 4} more page(s)</div>` : '');
+
+    let st = document.getElementById('page-style');
+    if (!st) { st = document.createElement('style'); st.id = 'page-style'; document.head.appendChild(st); }
+    st.textContent = `@page { size: ${g.W}mm ${g.H}mm; margin: 0; }`;
+    return true;
+}
+
+async function doPrint(){
+    if (!renderPrint()) return alert("Layout doesn't fit on the paper. Please adjust settings.");
+    await Promise.all([...document.querySelectorAll('#sheets img')].map(i => i.decode().catch(() => {})));
+    window.print();
+}
+
+(function initPrint(){
+    try {
+        const saved = JSON.parse(localStorage.getItem('qrPrintSettings') || 'null');
+        if (saved) P_KEYS.forEach(k => { const el = $p(k); if (el && k in saved) el.type === 'checkbox' ? (el.checked = saved[k]) : (el.value = saved[k]); });
+    } catch (e) {}
+    P_KEYS.forEach(k => { $p(k).addEventListener('input', renderPrint); $p(k).addEventListener('change', renderPrint); });
+    renderPrint();
+})();
+</script>
+</body>
+</html>

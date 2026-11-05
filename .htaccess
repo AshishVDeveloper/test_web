@@ -1,0 +1,14 @@
+# Only needed on an Apache server (XAMPP/WAMP). GitHub Pages ignores this file and uses 404.html.
+# Lets short links work:  /test_web/<token>  and  /test_web/generate
+RewriteEngine On
+
+# Real files/folders (images, css...) are served directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# /generate  ->  generate.html
+RewriteRule ^generate/?$ generate.html [L,QSA]
+
+# Everything else: /<token>  ->  index.html (the page reads the token from the address)
+RewriteRule ^([A-Za-z0-9_\-\.]+)/?$ index.html [L,QSA]
