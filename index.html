@@ -462,6 +462,8 @@ if (!data) {
 var name = String(data.name);
 var first = name.trim().split(/\s+/)[0];
 var dept = data.department ? String(data.department) : '';
+var leader = data.leader ? String(data.leader) : C.LEADER_NAME;
+var leaderTitle = data.leader_title ? String(data.leader_title) : C.LEADER_TITLE;
 document.title = 'Happy Diwali, ' + first;
 
 /** Image: Image URL in token > images/{key}.jpg|jpeg|png|webp (first that loads) > initials. */
@@ -683,7 +685,7 @@ html += '<header class="head">' +
   '<svg class="sky" viewBox="0 0 1000 420" preserveAspectRatio="xMidYMin meet" fill="none" aria-hidden="true">' +
   burst(205, 112, 56, '#ff5cd0', 0) + burst(795, 106, 58, '#ff9c5c', -1.1) + burst(128, 56, 26, '#b98cff', -.6) + burst(872, 52, 26, '#7ec9ff', -1.7) +
   '</svg>' +
-  '<p><span class="ribbon from">A Message From Your Team Lead</span></p>' +
+  '<p><span class="ribbon from">A Message From Your ' + (data.leader_title ? h(leaderTitle) : 'Team Lead') + '</span></p>' +
   '<p class="shubh" lang="hi">शुभ दीपावली</p>' +
   '<div class="title-row">' +
   '<svg viewBox="0 -8 100 98" aria-hidden="true">' + diya('translate(0 0)') + '</svg>' +
@@ -720,7 +722,7 @@ html += '<article class="letter">' +
   '<h2>Dear ' + h(first) + ',</h2>' +
   C.MESSAGE.map(function (p) { return '<p>' + h(p) + '</p>'; }).join('') +
   '<p class="wish">Wishing you and your family a very <strong>Happy and Prosperous Diwali!</strong></p>' +
-  '<div class="sign"><em>Warm regards,</em><strong>' + h(C.LEADER_NAME) + '</strong><span>' + h(C.LEADER_TITLE) + '</span></div>' +
+  '<div class="sign"><em>Warm regards,</em><strong>' + h(leader) + '</strong><span>' + h(leaderTitle) + '</span></div>' +
   '</article></main>';
 
 html += '<svg class="floor" viewBox="0 0 1000 250" aria-hidden="true">' +

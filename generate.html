@@ -173,13 +173,15 @@ document.getElementById('single-fields').innerHTML = Object.entries(FIELDS).map(
     `<div class="${k === 'image' ? 'full' : ''}">
         <label for="f-${esc(k)}">${esc(label)}${k === 'name' ? ' *' : ''}</label>
         <input id="f-${esc(k)}" name="${esc(k)}" ${k === 'name' ? 'required' : ''}>
+        ${k === 'leader' ? `<div class="hint">Leave empty to use <b>${esc(C.LEADER_NAME)}</b></div>` : ''}
+        ${k === 'leader_title' ? `<div class="hint">Leave empty to use <b>${esc(C.LEADER_TITLE)}</b></div>` : ''}
         ${k === 'image' ? '<div class="hint">Leave empty to auto-use a photo from the <b>images/</b> folder (e.g. <b>images/rahul_sharma.jpg</b> for "Rahul Sharma"). If none exists, initials are shown.</div>' : ''}
     </div>`).join('');
 document.getElementById('known-fields').textContent = Object.keys(FIELDS).join(', ');
 
 const SAMPLES = {
-    json: "[\n  {\"name\": \"Rahul Sharma\", \"department\": \"IT\"},\n  {\"name\": \"Priya Patel\", \"department\": \"HR\", \"image\": \"https://example.com/priya.jpg\"}\n]",
-    csv: "name,department,image\nRahul Sharma,IT,\nPriya Patel,HR,https://example.com/priya.jpg",
+    json: "[\n  {\"name\": \"Rahul Sharma\", \"department\": \"IT\", \"leader\": \"Ashish Chawan\", \"leader_title\": \"Team Leader\"},\n  {\"name\": \"Priya Patel\", \"department\": \"HR\", \"image\": \"https://example.com/priya.jpg\"}\n]",
+    csv: "name,department,leader,leader_title,image\nRahul Sharma,IT,Ashish Chawan,Team Leader,\nPriya Patel,HR,Neha Kapoor,HR Manager,https://example.com/priya.jpg",
 };
 function fill(t){ document.getElementById('bulk').value = SAMPLES[t]; }
 function showTab(tab){

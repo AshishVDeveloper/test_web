@@ -9,7 +9,7 @@ window.GREETING_CONFIG = {
   SECRET_KEY: 'change-this-secret-key-2026',
   SIG_LENGTH: 10,
 
-  // Signature at the end of every letter
+  // Signature at the end of every letter. Used when a link has no Leader Name / Leader Title of its own.
   LEADER_NAME: 'Ashish Chawan',
   LEADER_TITLE: 'Team Leader',
 
@@ -28,6 +28,8 @@ window.GREETING_CONFIG = {
   FIELDS: {
     name: 'Employee Name',
     department: 'Department',
+    leader: 'Leader Name (optional)',
+    leader_title: 'Leader Title (optional)',
     image: 'Image URL (optional)',
   },
 
@@ -35,6 +37,8 @@ window.GREETING_CONFIG = {
   ALIASES: {
     'emp name': 'name', 'emp_name': 'name', 'employee name': 'name', 'employee_name': 'name',
     'dept': 'department',
+    'leader name': 'leader', 'leader_name': 'leader', 'team lead': 'leader', 'team leader': 'leader', 'from': 'leader',
+    'leader title': 'leader_title', 'title': 'leader_title', 'designation': 'leader_title', 'lead title': 'leader_title',
     'image url': 'image', 'image_url': 'image', 'img': 'image', 'photo': 'image',
   },
 
