@@ -31,6 +31,10 @@ Photos: if no Image URL is given, the page looks for `images/<name>.jpg` (also `
 
 Because this is a static site, `config.js` (including `SECRET_KEY`) can be read by anyone who visits. The signature stops people from simply editing a link to change the name, but someone who reads the code could make their own links. Change `SECRET_KEY` to your own text before making real links (old links stop working when you change it).
 
+## File Sharing
+
+`file-sharing.html` sends files straight from one browser to another, on any network. One person clicks **Share files** and gets a code, link and QR code; the other opens it. Files go directly between the browsers with [PeerJS](https://peerjs.com/), not through a server. Both sides can send, and several people can join one code. Keep the page open until the transfer finishes. Received files are held in memory until saved, so very large files (over about 1 GB) may fail, especially on phones.
+
 ## Games
 
 Also in this site, in the `games/` folder (plain HTML + JavaScript, no server):

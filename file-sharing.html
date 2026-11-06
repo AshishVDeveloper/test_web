@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>File Sharing</title>
+<!--
+  Send files straight from one browser to another, on any network.
+  One person clicks "Share files" and gets a code (or link / QR code); the other opens it.
+  Files go directly between the two browsers with PeerJS (https://peerjs.com/), not through a server.
+  Both sides can send. Several people can join the same code; the person who made it sends to all of them.
+-->
+<style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #1e1e2e; color: #fff; margin: 0; padding: 24px 16px; }
+    main { max-width: 720px; margin: 0 auto; }
+    h1 { margin: 0 0 4px; font-size: 26px; text-align: center; }
+    .sub { margin: 0 0 20px; text-align: center; color: #bbb; font-size: 14px; }
+    .panel { background: #2b2b40; border-radius: 12px; padding: 18px; margin-bottom: 14px; }
+    .panel h2 { margin: 0 0 10px; font-size: 17px; color: #ffd166; }
+    .hint { color: #aaa; font-size: 13px; line-height: 1.5; margin: 8px 0 0; }
+    .err { color: #ff6b6b; font-size: 14px; min-height: 18px; margin-top: 8px; }
+    button, .btn {
+        padding: 10px 18px; font-size: 15px; border: none; border-radius: 8px; color: #fff; cursor: pointer;
+        background: #4caf50; text-decoration: none; display: inline-block; font-family: inherit;
+    }
+    button:hover, .btn:hover { filter: brightness(1.1); }
+    button:disabled { opacity: .5; cursor: default; filter: none; }
+    .btn.grey, button.grey { background: #607d8b; }
+    .btn.orange, button.orange { background: #ff9800; }
+    input[type=text] {
+        padding: 10px; font-size: 18px; border-radius: 8px; border: 1px solid #555; background: #1e1e2e; color: #fff;
+        letter-spacing: 3px; text-transform: uppercase; width: 100%; min-width: 0;
+    }
+
+    /* start screen */
+    .start { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .start .panel { margin: 0; display: flex; flex-direction: column; }
+    .start .panel p { margin: 0 0 14px; color: #ccc; font-size: 14px; line-height: 1.5; flex: 1; }
+    .joinRow { display: flex; gap: 8px; }
+
+    /* share screen */
+    .codeBox { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+    .codeText { font-size: 34px; font-weight: bold; letter-spacing: 6px; color: #ffd166; }
+    .linkRow { display: flex; gap: 8px; margin-top: 10px; }
+    .linkRow input { font-size: 13px; letter-spacing: 0; text-transform: none; padding: 8px; }
+    #qr { background: #fff; padding: 8px; border-radius: 8px; line-height: 0; }
+    #qr img, #qr canvas { width: 132px; height: 132px; }
+    .status { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+    .led { width: 10px; height: 10px; border-radius: 50%; background: #ff9800; flex: none; }
+    .led.on { background: #4caf50; }
+    #peers { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; color: #ccc; }
+    #peers li::before { content: '\25CF  '; color: #4caf50; }
+
+    #drop {
+        border: 2px dashed #5a5a80; border-radius: 12px; padding: 30px 16px; text-align: center; cursor: pointer;
+        color: #ccc; transition: background .15s, border-color .15s;
+    }
+    #drop.over { border-color: #ffd166; background: #33334d; }
+    #drop.off { opacity: .5; cursor: default; }
+    #drop .big { font-size: 40px; line-height: 1; }
+    #drop b { color: #fff; }
+
+    /* transfers */
+    .tr { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: center; padding: 10px 0; border-top: 1px solid #3a3a55; }
+    .tr:first-of-type { border-top: none; }
+    .tr .dir { font-size: 22px; grid-row: span 2; }
+    .tr .name { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .tr .info { font-size: 12px; color: #aaa; grid-column: 2; }
+    .tr .act { grid-row: span 2; grid-column: 3; }
+    .tr .act .btn { padding: 7px 14px; font-size: 14px; }
+    .bar { grid-column: 2; height: 6px; background: #1e1e2e; border-radius: 3px; overflow: hidden; }
+    .bar div { height: 100%; width: 0; background: #4caf50; transition: width .2s; }
+    .tr.recv .bar div { background: #2196f3; }
+    .tr.failed .bar div { background: #f44336; }
+    #empty { color: #888; font-size: 14px; margin: 0; }
+    .hidden { display: none !important; }
+
+    @media (max-width: 560px) {
+        body { padding: 16px 8px; }
+        .start { grid-template-columns: 1fr; }
+        .codeText { font-size: 28px; }
+        .panel { padding: 14px; }
+    }
+</style>
+</head>
+<body>
+<main>
+    <h1>&#128228; File Sharing</h1>
+    <p class="sub">Send files straight from one device to another, on any network. No upload, no sign-in.</p>
+
+    <!-- Start: make a code or join one -->
+    <section id="startView" class="start">
+        <div class="panel">
+            <h2>Share files</h2>
+            <p>Get a code, link and QR code. Give it to the other person, then send files when they join.</p>
+            <button id="hostBtn">Share files</button>
+        </div>
+        <div class="panel">
+            <h2>Receive files</h2>
+            <p>Got a code? Enter it here, or just open the link or scan the QR code you were given.</p>
+            <div class="joinRow">
+                <input type="text" id="codeIn" maxlength="6" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false">
+                <button id="joinBtn">Join</button>
+            </div>
+        </div>
+    </section>
+    <div class="err" id="startErr"></div>
+
+    <!-- Connected / waiting -->
+    <section id="shareView" class="hidden">
+        <div class="panel" id="codePanel">
+            <h2 id="codeTitle">Your share code</h2>
+            <div class="codeBox">
+                <div id="qr"></div>
+                <div style="flex:1;min-width:200px">
+                    <div class="codeText" id="codeText"></div>
+                    <div class="linkRow">
+                        <input type="text" id="linkIn" readonly>
+                        <button id="copyBtn" class="grey">Copy</button>
+                    </div>
+                    <p class="hint">Open the link or scan the QR code on the other device, or enter the code there. Keep this page open while sharing.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="status"><span class="led" id="led"></span><span id="statusText">Connecting…</span></div>
+            <ul id="peers"></ul>
+        </div>
+
+        <div class="panel">
+            <div id="drop" class="off">
+                <div class="big">&#128193;</div>
+                <p><b>Choose files</b> or drop them here</p>
+                <p class="hint" id="dropHint">You can send files once someone has joined.</p>
+            </div>
+            <input type="file" id="fileIn" multiple hidden>
+        </div>
+
+        <div class="panel">
+            <h2>Transfers</h2>
+            <p id="empty">Nothing sent or received yet.</p>
+            <div id="list"></div>
+        </div>
+
+        <button id="leaveBtn" class="grey">Stop sharing</button>
+        <div class="err" id="shareErr"></div>
+    </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+'use strict';
+const PREFIX = 'tw-fileshare-';                       // PeerJS id of the person who made the code
+const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';  // no 0/O or 1/I, easy to read out
+const CHUNK = 64 * 1024;                              // bytes per message
+const WINDOW = 2 * 1024 * 1024;                       // max bytes in flight before the receiver confirms
+
+const $ = id => document.getElementById(id);
+let peer = null, isHost = false, code = '';
+const conns = new Map();      // peer id -> { conn, name }
+const incoming = new Map();   // transfer id -> receiving state
+const outgoing = new Map();   // transfer id -> sending state
+
+/* ---------- helpers ---------- */
+function makeCode() {
+    const b = crypto.getRandomValues(new Uint8Array(6));
+    return [...b].map(x => LETTERS[x % LETTERS.length]).join('');
+}
+function randId() { return [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, '0')).join(''); }
+function size(n) {
+    if (n < 1024) return n + ' B';
+    const u = ['KB', 'MB', 'GB']; let i = -1;
+    do { n /= 1024; i++; } while (n >= 1024 && i < u.length - 1);
+    return n.toFixed(n < 10 ? 1 : 0) + ' ' + u[i];
+}
+function deviceName() {
+    const ua = navigator.userAgent;
+    if (/iPhone/.test(ua)) return 'iPhone';
+    if (/iPad/.test(ua)) return 'iPad';
+    if (/Android/.test(ua)) return /Mobile/.test(ua) ? 'Android phone' : 'Android tablet';
+    if (/Windows/.test(ua)) return 'Windows computer';
+    if (/Mac OS X/.test(ua)) return 'Mac';
+    if (/Linux/.test(ua)) return 'Linux computer';
+    return 'Device';
+}
+function shareLink() { return location.origin + location.pathname + '?code=' + code; }
+
+/* ---------- screens ---------- */
+function showShare() {
+    $('startView').classList.add('hidden');
+    $('startErr').textContent = '';
+    $('shareView').classList.remove('hidden');
+    $('codeText').textContent = code;
+    $('linkIn').value = shareLink();
+    $('codeTitle').textContent = isHost ? 'Your share code' : 'Joined code';
+    $('qr').textContent = '';
+    if (window.QRCode) {
+        try { new QRCode($('qr'), { text: shareLink(), width: 264, height: 264, correctLevel: QRCode.CorrectLevel.M }); }
+        catch (e) { $('qr').classList.add('hidden'); }
+    } else $('qr').classList.add('hidden');
+    // only the joining side keeps ?code= in the address (so a reload re-joins); the sharer's page stays plain
+    history.replaceState(null, '', location.pathname + (isHost ? '' : '?code=' + code));
+    updateStatus();
+}
+function showStart(msg) {
+    if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+    conns.clear();
+    $('shareView').classList.add('hidden');
+    $('startView').classList.remove('hidden');
+    $('startErr').textContent = msg || '';
+    $('hostBtn').disabled = $('joinBtn').disabled = false;
+    history.replaceState(null, '', location.pathname);
+}
+function updateStatus() {
+    const n = conns.size;
+    $('led').classList.toggle('on', n > 0);
+    if (!peer || !peer.open) $('statusText').textContent = 'Connecting…';
+    else if (n === 0) $('statusText').textContent = isHost ? 'Waiting for someone to join…' : 'Connecting to the other device…';
+    else $('statusText').textContent = 'Connected to ' + n + (n === 1 ? ' device' : ' devices');
+    $('peers').textContent = '';
+    conns.forEach(c => { const li = document.createElement('li'); li.textContent = c.name; $('peers').appendChild(li); });
+    $('drop').classList.toggle('off', n === 0);
+    $('dropHint').textContent = n === 0 ? 'You can send files once someone has joined.'
+        : (n === 1 ? 'Files go to the connected device.' : 'Files go to all ' + n + ' connected devices.');
+}
+
+/* ---------- start sharing (make a code) ---------- */
+function host(tries) {
+    tries = tries || 0;
+    isHost = true; code = makeCode();
+    $('hostBtn').disabled = $('joinBtn').disabled = true;
+    $('startErr').textContent = 'Getting a code…';
+    peer = new Peer(PREFIX + code, { debug: 0 });
+    peer.on('open', () => { showShare(); });
+    peer.on('connection', c => setupConn(c));
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+    peer.on('error', e => {
+        if (e.type === 'unavailable-id' && tries < 5) { peer.destroy(); host(tries + 1); return; }   // code taken: try another
+        if (!$('shareView').classList.contains('hidden')) { $('shareErr').textContent = 'Connection problem: ' + (e.type || e.message); return; }
+        showStart('Cannot reach the connection server (' + (e.type || e.message) + '). Check your internet and try again.');
+    });
+}
+
+/* ---------- join with a code ---------- */
+function join(c) {
+    c = String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (c.length !== 6) { $('startErr').textContent = 'The code has 6 letters and numbers.'; return; }
+    isHost = false; code = c;
+    $('hostBtn').disabled = $('joinBtn').disabled = true;
+    $('startErr').textContent = 'Connecting…';
+    peer = new Peer({ debug: 0 });
+    peer.on('open', () => {
+        showShare();
+        const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'binary' });
+        setupConn(conn);
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+    peer.on('error', e => {
+        if (e.type === 'peer-unavailable') showStart('Nobody is sharing with code ' + code + '. Check the code, or ask the other person to click "Share files" again.');
+        else showStart('Cannot connect (' + (e.type || e.message) + '). Check your internet and try again.');
+    });
+}
+
+/* ---------- one connection to another device ---------- */
+function setupConn(conn) {
+    conn.on('open', () => {
+        conns.set(conn.peer, { conn, name: 'Device' });
+        conn.send({ t: 'hello', name: deviceName() });
+        updateStatus();
+    });
+    conn.on('data', m => onData(conn, m));
+    conn.on('close', () => dropConn(conn));
+    conn.on('error', () => dropConn(conn));
+}
+function dropConn(conn) {
+    if (!conns.has(conn.peer)) return;
+    conns.delete(conn.peer);
+    // stop transfers with this device
+    outgoing.forEach(o => { if (o.conn === conn && !o.finished) failRow(o, 'Stopped: the other device left'); });
+    incoming.forEach((r, id) => { if (r.from === conn.peer) { failRow(r, 'Stopped: the other device left'); incoming.delete(id); } });
+    updateStatus();
+    if (!isHost) showStart('The person sharing has left or closed the page.');
+}
+
+function onData(conn, m) {
+    if (!m || typeof m !== 'object') return;
+    const c = conns.get(conn.peer);
+    if (m.t === 'hello' && c) { c.name = String(m.name || 'Device').slice(0, 40); updateStatus(); }
+    else if (m.t === 'meta') {
+        const r = { id: m.id, from: conn.peer, conn, name: String(m.name || 'file'), size: +m.size || 0,
+                    type: String(m.type || ''), parts: [], got: 0, start: Date.now(), lastAck: 0 };
+        r.row = addRow('recv', r.name, 'from ' + (c ? c.name : 'device'));
+        incoming.set(m.id, r);
+        progress(r, r.got, r.size);
+    }
+    else if (m.t === 'chunk') {
+        const r = incoming.get(m.id); if (!r) return;
+        const d = m.d instanceof ArrayBuffer ? m.d : (m.d && m.d.buffer ? m.d.buffer.slice(m.d.byteOffset, m.d.byteOffset + m.d.byteLength) : null);
+        if (!d) return;
+        r.parts.push(d); r.got += d.byteLength;
+        if (r.got - r.lastAck >= 256 * 1024 || r.got >= r.size) { r.lastAck = r.got; conn.send({ t: 'ack', id: r.id, got: r.got }); }
+        progress(r, r.got, r.size);
+    }
+    else if (m.t === 'done') {
+        const r = incoming.get(m.id); if (!r) return;
+        incoming.delete(m.id);
+        conn.send({ t: 'ack', id: r.id, got: r.got, done: true });
+        const blob = new Blob(r.parts, { type: r.type || 'application/octet-stream' });
+        r.parts = null;
+        finishRow(r, blob);
+    }
+    else if (m.t === 'ack') {
+        const o = outgoing.get(m.id); if (!o) return;
+        o.acked = m.got;
+        progress(o, o.acked, o.size);
+        if (o.wake) { const w = o.wake; o.wake = null; w(); }
+        if (m.done) { o.finished = true; outgoing.delete(o.id); doneRow(o); }
+    }
+}
+
+/* ---------- sending ---------- */
+function sendFiles(files) {
+    if (!conns.size) return;
+    [...files].forEach(f => conns.forEach(c => queueSend(c, f)));
+}
+// one file at a time per device, so each gets the full speed
+const queues = new Map();
+function queueSend(c, file) {
+    const o = { id: randId(), conn: c.conn, file, name: file.name, size: file.size, acked: 0, start: 0, finished: false };
+    o.row = addRow('send', file.name, 'to ' + c.name + ' · waiting');
+    progress(o, 0, o.size);
+    const prev = queues.get(c.conn.peer) || Promise.resolve();
+    const next = prev.then(() => sendOne(o)).catch(() => {});
+    queues.set(c.conn.peer, next);
+}
+async function sendOne(o) {
+    const conn = o.conn;
+    if (!conn.open) { failRow(o, 'Not sent: the other device left'); return; }
+    outgoing.set(o.id, o);
+    o.start = Date.now();
+    conn.send({ t: 'meta', id: o.id, name: o.name, size: o.size, type: o.file.type });
+    let off = 0;
+    while (off < o.size) {
+        // wait while too much is still on its way
+        while (off - o.acked > WINDOW) {
+            await new Promise(res => { o.wake = res; setTimeout(res, 3000); });
+            if (!conn.open || o.failed) return;
+        }
+        if (!conn.open || o.failed) return;
+        const buf = await o.file.slice(off, off + CHUNK).arrayBuffer();
+        conn.send({ t: 'chunk', id: o.id, d: buf });
+        off += buf.byteLength;
+    }
+    conn.send({ t: 'done', id: o.id });
+    // wait for the final confirmation before sending the next file
+    while (!o.finished && !o.failed && conn.open) await new Promise(res => { o.wake = res; setTimeout(res, 3000); });
+}
+
+/* ---------- transfer rows ---------- */
+function addRow(kind, name, who) {
+    $('empty').classList.add('hidden');
+    const row = document.createElement('div');
+    row.className = 'tr ' + kind;
+    row.innerHTML = '<div class="dir"></div><div class="name"></div><div class="act"></div><div class="bar"><div></div></div><div class="info"></div>';
+    row.querySelector('.dir').textContent = kind === 'send' ? '⬆️' : '⬇️';
+    row.querySelector('.name').textContent = name;
+    row.querySelector('.name').title = name;
+    row.who = who;
+    row.querySelector('.info').textContent = who;
+    $('list').prepend(row);
+    return row;
+}
+function progress(t, done, total) {
+    const row = t.row; if (!row) return;
+    const pct = total ? Math.min(100, Math.floor(done / total * 100)) : 100;
+    row.querySelector('.bar div').style.width = pct + '%';
+    const secs = (Date.now() - (t.start || Date.now())) / 1000;
+    const speed = secs > 0.5 ? ' · ' + size(done / secs) + '/s' : '';
+    row.querySelector('.info').textContent = row.who.replace(/ · waiting$/, '') + ' · ' + size(done) + ' of ' + size(total) + ' (' + pct + '%)' + speed;
+}
+function finishRow(r, blob) {
+    const row = r.row;
+    row.querySelector('.bar div').style.width = '100%';
+    row.querySelector('.info').textContent = row.who + ' · ' + size(r.size) + ' · received';
+    const a = document.createElement('a');
+    a.className = 'btn orange';
+    a.href = URL.createObjectURL(blob);
+    a.download = r.name;
+    a.textContent = 'Save';
+    row.querySelector('.act').appendChild(a);
+}
+function doneRow(o) {
+    o.row.querySelector('.bar div').style.width = '100%';
+    o.row.querySelector('.info').textContent = o.row.who.replace(/ · waiting$/, '') + ' · ' + size(o.size) + ' · sent ✔';
+}
+function failRow(t, msg) {
+    t.failed = true;
+    if (t.wake) { const w = t.wake; t.wake = null; w(); }
+    if (t.id) outgoing.delete(t.id);
+    if (!t.row) return;
+    t.row.classList.add('failed');
+    t.row.querySelector('.info').textContent = t.row.who.replace(/ · waiting$/, '') + ' · ' + msg;
+}
+
+/* ---------- page events ---------- */
+$('hostBtn').onclick = () => host();
+$('joinBtn').onclick = () => join($('codeIn').value);
+$('codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') join($('codeIn').value); });
+$('copyBtn').onclick = async () => {
+    try { await navigator.clipboard.writeText($('linkIn').value); }
+    catch (e) { $('linkIn').select(); document.execCommand('copy'); }
+    $('copyBtn').textContent = 'Copied'; setTimeout(() => { $('copyBtn').textContent = 'Copy'; }, 1500);
+};
+$('leaveBtn').onclick = () => { if (confirm('Stop sharing? Transfers in progress will stop.')) showStart(''); };
+
+$('drop').onclick = () => { if (conns.size) $('fileIn').click(); };
+$('fileIn').onchange = () => { sendFiles($('fileIn').files); $('fileIn').value = ''; };
+['dragenter', 'dragover'].forEach(ev => document.addEventListener(ev, e => {
+    e.preventDefault();
+    if (conns.size) $('drop').classList.add('over');
+}));
+['dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => {
+    e.preventDefault();
+    if (ev === 'dragleave' && e.relatedTarget) return;
+    $('drop').classList.remove('over');
+}));
+document.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) sendFiles(e.dataTransfer.files); });
+
+window.addEventListener('beforeunload', e => {
+    const busy = outgoing.size > 0 || incoming.size > 0;
+    if (busy) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// opened with a link: ?code=ABC123
+const fromLink = new URLSearchParams(location.search).get('code');
+if (!window.Peer) $('startErr').textContent = 'Could not load PeerJS. Check your internet connection and reload the page.';
+else if (fromLink) { $('codeIn').value = fromLink.toUpperCase(); join(fromLink); }
+</script>
+</body>
+</html>

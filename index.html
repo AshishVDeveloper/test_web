@@ -465,7 +465,10 @@ if (token === '') {
   document.title = 'Games';
   document.body.innerHTML =
     '<main class="notice"><h1>Games</h1>' +
-    '<section class="games"><div class="grid" id="game-list"></div></section></main>';
+    '<section class="games"><div class="grid" id="game-list"></div></section>' +
+    '<section class="games"><h2>Tools</h2><div class="grid">' +
+    '<a class="card" href="file-sharing.html"><div class="ic">📤</div><h2>File Sharing</h2>' +
+    '<p>Send files straight to another device with a code, link or QR code.</p></a></div></section></main>';
   if (window.renderGames) renderGames(document.getElementById('game-list'), 'games/');
   return;
 }
