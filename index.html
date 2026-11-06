@@ -280,7 +280,7 @@ body {
 
 .notice { min-height: 100vh; display: grid; place-content: center; text-align: center; padding: 24px; }
 .notice h1 { margin: 8px 0; font-family: var(--serif); font-size: clamp(1.75rem, 5vw, 2.75rem); color: var(--gold-light); }
-.games { width: min(720px, 100%); margin: 40px auto 0; text-align: left; }
+.games { width: min(720px, 100%); margin: 24px auto 0; text-align: left; }
 .games > h2 { margin: 0 0 14px; text-align: center; font-family: var(--serif); color: var(--gold); }
 .games .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
 .games a.card { display: block; padding: 18px; border-radius: 12px; border: 1px solid rgb(233 190 105 / .35); background: rgb(255 255 255 / .05); color: var(--parchment); text-decoration: none; }
@@ -460,13 +460,21 @@ function getToken() {
 var token = getToken();
 var data = token ? await GreetingToken.readToken(token, C) : null;
 
+/* No token: just the games list, no Diwali greeting */
+if (token === '') {
+  document.title = 'Games';
+  document.body.innerHTML =
+    '<main class="notice"><h1>Games</h1>' +
+    '<section class="games"><div class="grid" id="game-list"></div></section></main>';
+  if (window.renderGames) renderGames(document.getElementById('game-list'), 'games/');
+  return;
+}
+
 if (!data) {
   document.body.innerHTML =
     '<main class="notice"><p class="shubh" lang="hi">शुभ दीपावली</p>' +
-    '<h1>' + (token === '' ? 'Please use your personal link' : 'This link is not valid') + '</h1>' +
-    '<p>Open the full link or scan the QR code again. If it still does not work, ask your team leader for a new one.</p>' +
-    '<section class="games"><h2>Games</h2><div class="grid" id="game-list"></div></section></main>';
-  if (window.renderGames) renderGames(document.getElementById('game-list'), 'games/');
+    '<h1>This link is not valid</h1>' +
+    '<p>Open the full link or scan the QR code again. If it still does not work, ask your team leader for a new one.</p></main>';
   return;
 }
 
