@@ -44,6 +44,17 @@ Because this is a static site, `config.js` (including `SECRET_KEY`) can be read 
 
 Buttons: mute / unmute, camera on / off, switch between front and back camera (always on phones; on computers when there are two cameras), chat, and leave. Without a camera or microphone you can still join, see and hear the others, and chat. The camera only works on `https://` pages or `localhost`. Every person sends video to every other person, so big meetings are heavy on phones; they work best with up to about 4–6 people on video.
 
+### Safety
+
+- **Waiting room:** the person who started sees "Ravi wants to join" and presses **Admit** or **Deny** (calls and meetings). In a private call, once one person is admitted, everyone else is turned away automatically.
+- **Remove:** in a meeting, the starter can remove anyone (button on their video and in the people list). Removed or denied people can't ask again in that meeting.
+- **Password (optional):** set one when starting; joiners must type it. Tell it separately, not with the link.
+- **Safety code:** each pair of people sees a 6-digit number made from the encryption keys of their connection (top left in a private call, next to each name in a meeting). Read it to each other: if it matches, nobody is secretly in the middle.
+- **Encrypted:** video, sound and chat go directly between devices and are always encrypted by the browser (WebRTC).
+- **Library fingerprints:** PeerJS, the QR library and JSZip are loaded with `integrity` hashes on every page, so a hacked CDN can't change them.
+- **Hide my IP:** needs a relay (TURN) server. PeerJS's free relay servers no longer exist, so this option only appears after you add a relay server to `RELAY_SERVERS` at the top of the script in `connect-person.html` (TURN providers like metered.ca or Cloudflare have free plans). A relay also helps people on strict office/mobile networks connect.
+- **Not possible in a web page:** stopping screen recording, and proving someone's real identity (names are typed by each person; use the waiting room and the video to check who it is). The free PeerJS server that introduces the devices sees connection details such as IP addresses, but not the video or chat.
+
 ## Games
 
 Also in this site, in the `games/` folder (plain HTML + JavaScript, no server):
