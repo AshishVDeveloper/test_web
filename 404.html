@@ -8,15 +8,27 @@
   It turns short links into real ones:
     /test_web/<token>   -> /test_web/?t=<token>
     /test_web/generate  -> /test_web/generate.html
+    /test_web/snake.html or snake.php -> /test_web/games/snake.html (any game in games/)
 -->
 <script>
 (function () {
   var parts = location.pathname.split('/');
   var last = decodeURIComponent(parts.pop() || parts.pop() || '');
   var base = parts.join('/') + '/';
-  if (/^generate(\.php)?$/i.test(last)) location.replace(base + 'generate.html' + location.search + location.hash);
-  else if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(last)) location.replace(base + '?t=' + encodeURIComponent(last));
-  else location.replace(base);
+  var rest = location.search + location.hash;
+  function shortLink() {
+    if (/^generate(\.php)?$/i.test(last)) location.replace(base + 'generate.html' + rest);
+    else if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(last)) location.replace(base + '?t=' + encodeURIComponent(last));
+    else location.replace(base);
+  }
+  // /<game>.html or /<game>.php -> games/<game>.html, if that game page exists
+  var game = /^([A-Za-z0-9_-]+)\.(html|php)$/i.exec(last);
+  if (game && !/\/games\/$/.test(base)) {
+    var url = base + 'games/' + game[1] + '.html';
+    fetch(url, { method: 'HEAD' })
+      .then(function (r) { if (r.ok) location.replace(url + rest); else shortLink(); })
+      .catch(shortLink);
+  } else shortLink();
 })();
 </script>
 </head>
