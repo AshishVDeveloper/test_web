@@ -37,7 +37,8 @@ Also in this site, in the `games/` folder (plain HTML + JavaScript, no server):
 
 | Page | Game |
 |---|---|
-| `games/` | Menu of all games |
+| `games/` | Menu of all games (also shown on the home page when it is opened without a personal link) |
+| `games/games.js` | The list of games both menus are built from. Add a line here when you add a game |
 | `games/snake.html` | Snake. High score is saved in your browser |
 | `games/snake-multy.html` | Multiplayer Snake, up to 8 players per room. The first player in a room hosts the game in their browser (keep that tab open); others join with the same room name from any network. Uses [PeerJS](https://peerjs.com/) to connect the browsers |
 | `games/snake_ladder.html` | Snake & Ladder, 2–4 players or computer. Wins are saved in your browser |

@@ -18,11 +18,8 @@
 </head>
 <body>
 <h1>Games</h1>
-<div class="grid">
-    <a class="card" href="snake.html"><div class="ic">&#128013;</div><h2>Snake</h2><p>Classic snake with boosters, settings and full screen.</p></a>
-    <a class="card" href="snake-multy.html"><div class="ic">&#127918;</div><h2>Multiplayer Snake</h2><p>Up to 8 players in a room, on any network.</p></a>
-    <a class="card" href="snake_ladder.html"><div class="ic">&#127922;</div><h2>Snake &amp; Ladder</h2><p>2–4 players, humans or computer, fixed or random board.</p></a>
-    <a class="card" href="sudoku.html"><div class="ic">&#128290;</div><h2>Sudoku</h2><p>Four levels, notes, hints, undo and best times.</p></a>
-</div>
+<div class="grid" id="games"></div>
+<script src="games.js"></script>
+<script>renderGames(document.getElementById('games'), '');</script>
 </body>
 </html>
