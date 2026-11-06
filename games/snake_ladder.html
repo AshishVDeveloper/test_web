@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snake and Ladder</title>
+<style>
+    * { box-sizing: border-box; }
+    :root { --size: 500px; --step: 180ms; }
+    body { font-family: Arial, sans-serif; background: #1e1e2e; color: #fff; margin: 0; padding: 20px 16px; }
+    #game { display: flex; flex-direction: column; align-items: center; background: #1e1e2e; padding: 10px; }
+    #game:fullscreen { justify-content: center; width: 100vw; height: 100vh; }
+    .topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    h1 { margin: 0; font-size: 24px; }
+    .icon-btn {
+        width: 38px; height: 38px; border: none; border-radius: 8px;
+        background: #3a3a55; color: #fff; font-size: 20px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .icon-btn:hover { background: #4a4a70; }
+
+    .main { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+    #game:fullscreen .main { flex-wrap: nowrap; }
+
+    /* board */
+    #boardWrap {
+        position: relative; width: var(--size); height: var(--size); max-width: 100%;
+        border: 4px solid #5d4037; border-radius: 6px; background: #fff;
+    }
+    #cells { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(10, 1fr); }
+    .cell {
+        position: relative; font-size: calc(var(--size) / 10 * 0.2); font-weight: bold; color: #555;
+        padding: 2px 4px;
+    }
+    .cell.c0 { background: #fff8e1; } .cell.c1 { background: #e3f2fd; }
+    .cell.c2 { background: #fce4ec; } .cell.c3 { background: #e8f5e9; }
+    .cell.goal { background: #ffd54f; }
+    .cell.goal::after { content: '\2605'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: calc(var(--size) / 10 * 0.5); color: #ff8f00; }
+    #art { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    .token {
+        position: absolute; width: calc(var(--size) / 10 * 0.38); height: calc(var(--size) / 10 * 0.38);
+        border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,.6);
+        transform: translate(-50%, -50%);
+        transition: left var(--step) ease, top var(--step) ease;
+        z-index: 2;
+    }
+    .token.active { box-shadow: 0 0 0 3px #fff, 0 0 10px 4px rgba(255,255,255,.8); z-index: 3; }
+
+    /* side panel */
+    .side { width: 260px; max-width: 100%; display: flex; flex-direction: column; gap: 12px; }
+    .panel { background: #2b2b40; border-radius: 10px; padding: 12px; }
+    .player { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; font-size: 14px; }
+    .player.turn { background: #3f3f60; outline: 2px solid #ffd166; }
+    .dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; flex: none; }
+    .player .pos { margin-left: auto; font-weight: bold; color: #ffd166; }
+    .player small { color: #aaa; }
+
+    .diceBox { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    #dice {
+        width: 80px; height: 80px; background: #fff; border-radius: 14px;
+        display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+        padding: 10px; box-shadow: 0 4px 0 #bbb; cursor: pointer;
+    }
+    #dice.rolling { animation: shake .15s infinite; }
+    @keyframes shake { 0% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } 100% { transform: rotate(-12deg); } }
+    #dice span { width: 13px; height: 13px; border-radius: 50%; background: #222; margin: auto; visibility: hidden; }
+    #dice span.on { visibility: visible; }
+    #rollBtn {
+        padding: 10px 28px; font-size: 17px; border: none; border-radius: 8px;
+        background: #ff9800; color: #fff; cursor: pointer; font-weight: bold;
+    }
+    #rollBtn:disabled { opacity: .5; cursor: default; }
+    #turnText { font-size: 15px; text-align: center; min-height: 20px; }
+    #log { font-size: 13px; color: #ccc; max-height: 130px; overflow-y: auto; line-height: 1.5; }
+    #log div:first-child { color: #fff; font-weight: bold; }
+    .side .row2 { display: flex; gap: 8px; }
+    .side .row2 button { flex: 1; padding: 8px; border: none; border-radius: 8px; background: #3a3a55; color: #fff; cursor: pointer; font-size: 14px; }
+
+    #winBox {
+        position: absolute; inset: 0; background: rgba(0,0,0,.75); z-index: 5;
+        display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+        font-size: 28px; font-weight: bold; text-align: center;
+    }
+    #winBox.show { display: flex; }
+    #winBox button { font-size: 16px; padding: 8px 20px; border: none; border-radius: 8px; background: #ff9800; color: #fff; cursor: pointer; }
+
+    /* settings modal */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+    .overlay.show { display: flex; }
+    .modal { background: #2b2b40; border-radius: 12px; padding: 20px; width: 100%; max-width: 380px; max-height: 90vh; overflow-y: auto; }
+    .modal h2 { margin: 0 0 14px; font-size: 20px; }
+    .modal h3 { margin: 14px 0 8px; font-size: 15px; color: #ffd166; }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
+    .row label { font-size: 14px; }
+    .row input[type=number], .row select { width: 110px; padding: 5px; border-radius: 6px; border: 1px solid #555; background: #1e1e2e; color: #fff; }
+    .prow { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+    .prow input[type=text] { flex: 1; min-width: 0; padding: 5px; border-radius: 6px; border: 1px solid #555; background: #1e1e2e; color: #fff; }
+    .prow input[type=color] { width: 36px; height: 30px; border: none; background: none; padding: 0; }
+    .prow select { padding: 5px; border-radius: 6px; border: 1px solid #555; background: #1e1e2e; color: #fff; }
+    .prow.off { opacity: .35; }
+    .modal .btns { display: flex; gap: 8px; margin-top: 16px; }
+    .modal .btns button { flex: 1; padding: 9px; border: none; border-radius: 8px; color: #fff; font-size: 15px; cursor: pointer; }
+    #saveSet { background: #4caf50; } #resetSet { background: #f44336; } #closeSet { background: #607d8b; }
+    .hint { font-size: 12px; color: #aaa; margin: -4px 0 8px; }
+</style>
+</head>
+<body>
+
+<div id="game">
+    <div class="topbar">
+        <h1>Snake &amp; Ladder</h1>
+        <button class="icon-btn" id="settingsBtn" title="Settings">&#9881;</button>
+        <button class="icon-btn" id="fullBtn" title="Full screen">&#x26F6;</button>
+    </div>
+
+    <div class="main">
+        <div id="boardWrap">
+            <div id="cells"></div>
+            <svg id="art" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+            <div id="tokens"></div>
+            <div id="winBox"><div id="winText"></div><button id="againBtn">Play Again</button></div>
+        </div>
+
+        <div class="side">
+            <div class="panel" id="players"></div>
+            <div class="panel diceBox">
+                <div id="turnText"></div>
+                <div id="dice" title="Roll"></div>
+                <button id="rollBtn">Roll Dice</button>
+            </div>
+            <div class="panel"><div id="log"></div></div>
+            <div class="row2">
+                <button id="newBtn">&#10010; New Game</button>
+                <button id="newBoardBtn">&#8635; New Board</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Settings modal -->
+<div class="overlay" id="settingsBox">
+    <div class="modal">
+        <h2>&#9881; Settings</h2>
+
+        <h3>Players</h3>
+        <div class="row"><label>Number of players</label>
+            <select id="sCount"><option>2</option><option>3</option><option>4</option></select>
+        </div>
+        <div id="sPlayers"></div>
+
+        <h3>Board</h3>
+        <div class="row"><label>Layout</label>
+            <select id="sLayout"><option value="classic">Fixed</option><option value="random">Random</option></select>
+        </div>
+        <div class="row"><label>Snakes (random)</label><input type="number" id="sSnakes" min="3" max="12"></div>
+        <div class="row"><label>Ladders (random)</label><input type="number" id="sLadders" min="3" max="12"></div>
+
+        <h3>Rules</h3>
+        <div class="row"><label>Reaching 100</label>
+            <select id="sFinish">
+                <option value="bounce">Bounce back</option>
+                <option value="exact">Exact roll</option>
+                <option value="any">Any roll wins</option>
+            </select>
+        </div>
+        <div class="hint">Bounce back: extra steps go backwards from 100. Exact roll: stay put if the roll is too big.</div>
+        <div class="row"><label>Roll again on 6</label><input type="checkbox" id="sSix"></div>
+
+        <h3>Look</h3>
+        <div class="row"><label>Move speed (ms per step)</label><input type="number" id="sSpeed" min="50" max="800" step="10"></div>
+        <div class="row"><label>Board size (px)</label><input type="number" id="sSize" min="280" max="900" step="10"></div>
+
+        <div class="hint">Saving starts a new game.</div>
+        <div class="btns">
+            <button id="saveSet">Save</button>
+            <button id="resetSet">Default</button>
+            <button id="closeSet">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const DEFAULTS = {
+    players: [
+        { name: 'Player 1', color: '#e53935', cpu: false },
+        { name: 'Computer', color: '#1e88e5', cpu: true },
+        { name: 'Player 3', color: '#43a047', cpu: false },
+        { name: 'Player 4', color: '#fdd835', cpu: true },
+    ],
+    count: 2,           // number of players
+    layout: 'classic',  // classic | random
+    nSnakes: 8,
+    nLadders: 7,
+    finish: 'bounce',   // bounce | exact | any
+    extraSix: true,     // roll again on 6
+    speed: 180,         // ms per step
+    boardSize: 500,
+};
+// Fixed board layout: from -> to
+const CLASSIC = {
+    ladders: { 4: 25, 13: 46, 33: 49, 42: 63, 50: 69, 62: 81, 74: 92 },
+    snakes:  { 27: 5, 40: 3, 43: 18, 54: 31, 66: 45, 76: 58, 89: 53, 99: 41 },
+};
+// Win counts are kept in this browser (localStorage)
+let wins = (() => { try { return JSON.parse(localStorage.getItem('snakeLadderWins')) || {}; } catch (e) { return {}; } })();
+
+// Random board: no cell used twice, each jump goes to another row
+const rowOf = n => Math.floor((n - 1) / 10);
+const randInt = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
+function randomBoard(nSnakes, nLadders) {
+    const used = { 1: true, 100: true }, ladders = {}, snakes = {};
+    const pick = (min, max) => {
+        for (let t = 0; t < 200; t++) { const n = randInt(min, max); if (!used[n]) return n; }
+        return null;
+    };
+    for (let i = 0; i < nLadders; i++) {
+        const a = pick(2, 80); if (a === null) break;
+        used[a] = true;
+        const b = pick((rowOf(a) + 1) * 10 + 1, Math.min(99, a + 45));
+        if (b === null) { delete used[a]; continue; }
+        used[b] = true; ladders[a] = b;
+    }
+    for (let i = 0; i < nSnakes; i++) {
+        const a = pick(21, 99); if (a === null) break;
+        used[a] = true;
+        const b = pick(Math.max(2, a - 45), rowOf(a) * 10);
+        if (b === null) { delete used[a]; continue; }
+        used[b] = true; snakes[a] = b;
+    }
+    return { ladders, snakes };
+}
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+let cfg = loadCfg();
+let board = CLASSIC, players = [], turn = 0, busy = false, over = false, tokens = [], gameId = 0;
+
+// ---------- settings storage ----------
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+function loadCfg() {
+    try {
+        const s = JSON.parse(localStorage.getItem('snakeLadderCfg') || '{}');
+        const c = Object.assign(clone(DEFAULTS), s);
+        if (!Array.isArray(c.players) || c.players.length !== 4) c.players = clone(DEFAULTS.players);
+        return c;
+    } catch (e) { return clone(DEFAULTS); }
+}
+function saveCfg() { try { localStorage.setItem('snakeLadderCfg', JSON.stringify(cfg)); } catch (e) {} }
+function clamp(v, min, max, def) { v = parseInt(v, 10); return isNaN(v) ? def : Math.min(max, Math.max(min, v)); }
+
+// ---------- board geometry ----------
+// cell n (1..100) -> centre in % ; row 0 is bottom, rows zig-zag
+function pos(n) {
+    const i = n - 1, row = Math.floor(i / 10);
+    const col = row % 2 === 0 ? i % 10 : 9 - (i % 10);
+    return { x: col * 10 + 5, y: (9 - row) * 10 + 5 };
+}
+
+function buildCells() {
+    const el = $('cells');
+    el.innerHTML = '';
+    for (let r = 9; r >= 0; r--) {
+        for (let c = 0; c < 10; c++) {
+            const n = r * 10 + (r % 2 === 0 ? c + 1 : 10 - c);
+            const d = document.createElement('div');
+            d.className = 'cell c' + ((r + c) % 4) + (n === 100 ? ' goal' : '');
+            d.textContent = n;
+            el.appendChild(d);
+        }
+    }
+}
+
+function drawArt() {
+    const svg = $('art');
+    let h = '';
+    // ladders
+    for (const [a, b] of Object.entries(board.ladders)) {
+        const p = pos(+a), q = pos(+b);
+        const dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy);
+        const nx = -dy / len * 1.8, ny = dx / len * 1.8;
+        h += `<line x1="${p.x + nx}" y1="${p.y + ny}" x2="${q.x + nx}" y2="${q.y + ny}" stroke="#8d6e63" stroke-width="1.1" stroke-linecap="round"/>`;
+        h += `<line x1="${p.x - nx}" y1="${p.y - ny}" x2="${q.x - nx}" y2="${q.y - ny}" stroke="#8d6e63" stroke-width="1.1" stroke-linecap="round"/>`;
+        const rungs = Math.max(2, Math.floor(len / 4));
+        for (let k = 1; k < rungs; k++) {
+            const t = k / rungs, x = p.x + dx * t, y = p.y + dy * t;
+            h += `<line x1="${x + nx}" y1="${y + ny}" x2="${x - nx}" y2="${y - ny}" stroke="#a1887f" stroke-width="0.8"/>`;
+        }
+    }
+    // snakes (head at higher number)
+    const snakeColors = ['#2e7d32', '#6a1b9a', '#c62828', '#ef6c00', '#00838f', '#ad1457'];
+    let si = 0;
+    for (const [a, b] of Object.entries(board.snakes)) {
+        const head = pos(+a), tail = pos(+b), col = snakeColors[si++ % snakeColors.length];
+        const dx = tail.x - head.x, dy = tail.y - head.y, len = Math.hypot(dx, dy);
+        const nx = -dy / len, ny = dx / len, w = Math.min(8, len / 4);
+        const c1 = { x: head.x + dx * .33 + nx * w, y: head.y + dy * .33 + ny * w };
+        const c2 = { x: head.x + dx * .66 - nx * w, y: head.y + dy * .66 - ny * w };
+        const d = `M${head.x} ${head.y} C${c1.x} ${c1.y} ${c2.x} ${c2.y} ${tail.x} ${tail.y}`;
+        h += `<path d="${d}" fill="none" stroke="${col}" stroke-width="2.6" stroke-linecap="round" opacity=".9"/>`;
+        h += `<path d="${d}" fill="none" stroke="#fff" stroke-width="0.5" stroke-dasharray="1 2" stroke-linecap="round" opacity=".6"/>`;
+        h += `<ellipse cx="${head.x}" cy="${head.y}" rx="2.3" ry="2" fill="${col}"/>`;
+        h += `<circle cx="${head.x - 0.8}" cy="${head.y - 0.6}" r="0.5" fill="#fff"/><circle cx="${head.x + 0.8}" cy="${head.y - 0.6}" r="0.5" fill="#fff"/>`;
+        h += `<circle cx="${head.x - 0.8}" cy="${head.y - 0.6}" r="0.22" fill="#000"/><circle cx="${head.x + 0.8}" cy="${head.y - 0.6}" r="0.22" fill="#000"/>`;
+    }
+    svg.innerHTML = h;
+}
+
+// ---------- tokens ----------
+const OFFS = [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]];
+function placeTokens() {
+    players.forEach((p, i) => {
+        const t = tokens[i];
+        if (p.pos === 0) { t.style.display = 'none'; return; }
+        t.style.display = '';
+        const c = pos(p.pos);
+        const shared = players.filter(o => o.pos === p.pos).length > 1;
+        const o = shared ? OFFS[i] : [0, 0];
+        t.style.left = (c.x + o[0]) + '%';
+        t.style.top = (c.y + o[1]) + '%';
+        t.classList.toggle('active', i === turn && !over);
+    });
+}
+
+// ---------- dice ----------
+const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+const diceEl = $('dice');
+for (let i = 0; i < 9; i++) diceEl.appendChild(document.createElement('span'));
+function showDice(n) { [...diceEl.children].forEach((s, i) => s.classList.toggle('on', PIPS[n].includes(i))); }
+
+// ---------- UI ----------
+function renderPlayers() {
+    $('players').innerHTML = players.map((p, i) =>
+        `<div class="player ${i === turn && !over ? 'turn' : ''}">
+            <div class="dot" style="background:${p.color}"></div>
+            <div>${esc(p.name)} ${p.cpu ? '<small>(CPU)</small>' : ''}<br><small>Wins: ${(wins && wins[p.name]) || 0}</small></div>
+            <div class="pos">${p.pos || 'Start'}</div>
+        </div>`).join('');
+    const p = players[turn];
+    $('turnText').innerHTML = over ? '' : `<b style="color:${p.color}">${esc(p.name)}</b>'s turn`;
+    $('rollBtn').disabled = busy || over || p.cpu;
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function log(msg) {
+    const d = document.createElement('div');
+    d.innerHTML = msg;
+    $('log').prepend(d);
+    while ($('log').children.length > 30) $('log').lastChild.remove();
+}
+
+// ---------- game flow ----------
+function newGame() {
+    gameId++;
+    over = false; busy = false; turn = 0;
+    players = cfg.players.slice(0, cfg.count).map(p => ({ ...p, pos: 0 }));
+    $('tokens').innerHTML = '';
+    tokens = players.map(p => {
+        const t = document.createElement('div');
+        t.className = 'token';
+        t.style.background = p.color;
+        $('tokens').appendChild(t);
+        return t;
+    });
+    $('winBox').classList.remove('show');
+    $('log').innerHTML = '';
+    log('New game! Roll a dice to start.');
+    showDice(1);
+    applyLook();
+    placeTokens();
+    renderPlayers();
+    nextTurn(true);
+}
+
+function loadBoard() {
+    if (cfg.layout !== 'random') { board = CLASSIC; drawArt(); newGame(); return; }
+    board = randomBoard(Math.max(3, Math.min(12, cfg.nSnakes)), Math.max(3, Math.min(12, cfg.nLadders)));
+    drawArt(); newGame();
+}
+
+async function roll() {
+    if (busy || over) return;
+    busy = true;
+    renderPlayers();
+    const gid = gameId;
+    const wait = async ms => { await sleep(ms); if (gid !== gameId) throw 'stop'; };
+    try { await doRoll(wait); } catch (e) { if (e !== 'stop') throw e; }
+}
+
+async function doRoll(sleep) {
+    const p = players[turn], name = `<span style="color:${p.color}">${esc(p.name)}</span>`;
+
+    // dice animation
+    diceEl.classList.add('rolling');
+    for (let k = 0; k < 8; k++) { showDice(1 + Math.floor(Math.random() * 6)); await sleep(70); }
+    const v = 1 + Math.floor(Math.random() * 6);
+    showDice(v);
+    diceEl.classList.remove('rolling');
+    await sleep(200);
+
+    let target = p.pos + v;
+    if (target > 100 && cfg.finish === 'exact') {
+        log(`${name} rolled ${v} — needs exactly ${100 - p.pos}, stays.`);
+    } else {
+        log(`${name} rolled ${v}`);
+        // step by step
+        let dirn = 1, steps = v;
+        while (steps-- > 0) {
+            if (p.pos === 100) {
+                if (cfg.finish === 'any') break;
+                dirn = -1;
+            }
+            p.pos += dirn;
+            placeTokens();
+            await sleep(cfg.speed);
+        }
+        if (dirn === -1) log(`${name} bounced back to ${p.pos}`);
+
+        // snake or ladder
+        if (board.ladders[p.pos]) {
+            const to = board.ladders[p.pos];
+            log(`&#129692; ${name} climbs a ladder ${p.pos} &rarr; ${to}`);
+            await slide(p, to, sleep);
+        } else if (board.snakes[p.pos]) {
+            const to = board.snakes[p.pos];
+            log(`&#128013; ${name} bitten by a snake ${p.pos} &rarr; ${to}`);
+            await slide(p, to, sleep);
+        }
+    }
+
+    if (p.pos >= 100) {
+        p.pos = 100;
+        placeTokens();
+        return win(p);
+    }
+
+    busy = false;
+    if (v === 6 && cfg.extraSix) {
+        log(`${name} rolled a 6 — roll again!`);
+        nextTurn(true);
+    } else {
+        turn = (turn + 1) % players.length;
+        nextTurn(false);
+    }
+}
+
+async function slide(p, to, sleep) {
+    await sleep(150);
+    document.documentElement.style.setProperty('--step', Math.max(400, cfg.speed * 3) + 'ms');
+    p.pos = to;
+    placeTokens();
+    await sleep(Math.max(400, cfg.speed * 3) + 50);
+    document.documentElement.style.setProperty('--step', cfg.speed + 'ms');
+}
+
+function nextTurn() {
+    placeTokens();
+    renderPlayers();
+    const p = players[turn];
+    const gid = gameId;
+    if (p.cpu && !over) setTimeout(() => { if (gid === gameId) roll(); }, 700);
+}
+
+function win(p) {
+    over = true; busy = false;
+    log(`&#127942; <b>${esc(p.name)} wins!</b>`);
+    $('winText').innerHTML = `&#127942;<br><span style="color:${p.color}">${esc(p.name)}</span> wins!`;
+    $('winBox').classList.add('show');
+    renderPlayers();
+    const key = p.name.trim().slice(0, 20);
+    wins[key] = (wins[key] || 0) + 1;
+    try { localStorage.setItem('snakeLadderWins', JSON.stringify(wins)); } catch (e) {}
+    renderPlayers();
+}
+
+// ---------- look / full screen ----------
+function applyLook() {
+    document.documentElement.style.setProperty('--step', cfg.speed + 'ms');
+    fitBoard();
+}
+function fitBoard() {
+    let size;
+    if (document.fullscreenElement === $('game')) {
+        size = Math.min(window.innerWidth - 320, window.innerHeight - 90);
+        if (size < 300) size = Math.min(window.innerWidth - 40, window.innerHeight - 90);
+    } else {
+        size = Math.min(cfg.boardSize, window.innerWidth - 40);
+    }
+    size = Math.max(260, Math.floor(size / 10) * 10);
+    document.documentElement.style.setProperty('--size', size + 'px');
+}
+$('fullBtn').onclick = () => {
+    if (!document.fullscreenElement) {
+        if ($('game').requestFullscreen) $('game').requestFullscreen().catch(() => {});
+    } else document.exitFullscreen();
+};
+document.addEventListener('fullscreenchange', () => {
+    const box = $('settingsBox');
+    if (document.fullscreenElement) document.fullscreenElement.appendChild(box);
+    else document.body.appendChild(box);
+    $('fullBtn').innerHTML = document.fullscreenElement ? '&#x2715;' : '&#x26F6;';
+    $('fullBtn').title = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+    fitBoard();
+});
+window.addEventListener('resize', fitBoard);
+
+// ---------- settings modal ----------
+function fillForm(c) {
+    $('sCount').value = c.count;
+    $('sPlayers').innerHTML = c.players.map((p, i) => `
+        <div class="prow" data-i="${i}">
+            <input type="color" value="${p.color}">
+            <input type="text" maxlength="20" value="${esc(p.name)}">
+            <select><option value="0">Human</option><option value="1" ${p.cpu ? 'selected' : ''}>Computer</option></select>
+        </div>`).join('');
+    markPlayers();
+    $('sLayout').value = c.layout;
+    $('sSnakes').value = c.nSnakes;
+    $('sLadders').value = c.nLadders;
+    $('sFinish').value = c.finish;
+    $('sSix').checked = c.extraSix;
+    $('sSpeed').value = c.speed;
+    $('sSize').value = c.boardSize;
+}
+function markPlayers() {
+    const n = +$('sCount').value;
+    [...$('sPlayers').children].forEach((r, i) => r.classList.toggle('off', i >= n));
+}
+$('sCount').onchange = markPlayers;
+function openSettings() { fillForm(cfg); $('settingsBox').classList.add('show'); }
+function closeSettings() { $('settingsBox').classList.remove('show'); }
+$('saveSet').onclick = () => {
+    cfg.count = clamp($('sCount').value, 2, 4, 2);
+    cfg.players = [...$('sPlayers').children].map((r, i) => {
+        const [color, name, cpu] = r.querySelectorAll('input, select');
+        return { color: color.value, name: name.value.trim() || 'Player ' + (i + 1), cpu: cpu.value === '1' };
+    });
+    if (cfg.players.slice(0, cfg.count).every(p => p.cpu)) cfg.players[0].cpu = false; // keep at least one human
+    cfg.layout   = $('sLayout').value;
+    cfg.nSnakes  = clamp($('sSnakes').value, 3, 12, DEFAULTS.nSnakes);
+    cfg.nLadders = clamp($('sLadders').value, 3, 12, DEFAULTS.nLadders);
+    cfg.finish   = $('sFinish').value;
+    cfg.extraSix = $('sSix').checked;
+    cfg.speed    = clamp($('sSpeed').value, 50, 800, DEFAULTS.speed);
+    cfg.boardSize = clamp($('sSize').value, 280, 900, DEFAULTS.boardSize);
+    saveCfg();
+    closeSettings();
+    loadBoard();
+};
+$('resetSet').onclick = () => fillForm(clone(DEFAULTS));
+$('closeSet').onclick = closeSettings;
+$('settingsBox').onclick = e => { if (e.target.id === 'settingsBox') closeSettings(); };
+
+// ---------- buttons ----------
+$('rollBtn').onclick = roll;
+diceEl.onclick = () => { if (!players[turn].cpu) roll(); };
+$('newBtn').onclick = newGame;
+$('againBtn').onclick = newGame;
+$('newBoardBtn').onclick = () => {
+    if (cfg.layout !== 'random') { cfg.layout = 'random'; saveCfg(); }
+    loadBoard();
+};
+$('settingsBtn').onclick = openSettings;
+document.addEventListener('keydown', e => {
+    if ($('settingsBox').classList.contains('show')) return;
+    if ((e.key === ' ' || e.key === 'Enter') && !players[turn].cpu) { e.preventDefault(); roll(); }
+    if (e.key === 'f' || e.key === 'F') $('fullBtn').onclick();
+});
+
+buildCells();
+loadBoard();
+</script>
+</body>
+</html>

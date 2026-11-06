@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Games</title>
+<style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #1e1e2e; color: #fff; margin: 0; padding: 32px 16px; }
+    h1 { text-align: center; margin: 0 0 24px; font-size: 28px; }
+    .grid { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+    a.card { display: block; background: #2b2b40; border-radius: 12px; padding: 20px; color: #fff; text-decoration: none; border: 2px solid transparent; }
+    a.card:hover, a.card:focus-visible { border-color: #ffd166; background: #33334d; }
+    .card .ic { font-size: 34px; }
+    .card h2 { margin: 8px 0 4px; font-size: 18px; }
+    .card p { margin: 0; color: #bbb; font-size: 14px; line-height: 1.4; }
+</style>
+</head>
+<body>
+<h1>Games</h1>
+<div class="grid">
+    <a class="card" href="snake.html"><div class="ic">&#128013;</div><h2>Snake</h2><p>Classic snake with boosters, settings and full screen.</p></a>
+    <a class="card" href="snake-multy.html"><div class="ic">&#127918;</div><h2>Multiplayer Snake</h2><p>Up to 8 players in a room, on any network.</p></a>
+    <a class="card" href="snake_ladder.html"><div class="ic">&#127922;</div><h2>Snake &amp; Ladder</h2><p>2–4 players, humans or computer, fixed or random board.</p></a>
+    <a class="card" href="sudoku.html"><div class="ic">&#128290;</div><h2>Sudoku</h2><p>Four levels, notes, hints, undo and best times.</p></a>
+</div>
+</body>
+</html>

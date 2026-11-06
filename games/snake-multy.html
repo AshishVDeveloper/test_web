@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multiplayer Snake</title>
+<style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #1e1e2e; color: #fff; margin: 0; padding: 20px 16px; }
+    #game { display: flex; flex-direction: column; align-items: center; background: #1e1e2e; padding: 10px; }
+    #game:fullscreen { justify-content: center; width: 100vw; height: 100vh; }
+    .topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    h1 { margin: 0; font-size: 24px; }
+    .icon-btn {
+        width: 38px; height: 38px; border: none; border-radius: 8px; background: #3a3a55;
+        color: #fff; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .icon-btn:hover { background: #4a4a70; }
+    .info { font-size: 14px; margin-bottom: 8px; text-align: center; }
+    .info span { font-weight: bold; color: #ffd166; }
+
+    .main { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+    #game:fullscreen .main { flex-wrap: nowrap; }
+    .boardCol { display: flex; flex-direction: column; align-items: center; }
+    #boardWrap { position: relative; }
+    canvas { display: block; background: #111; border: 3px solid #4caf50; touch-action: none; }
+    .msgBox {
+        position: absolute; inset: 0; background: rgba(0,0,0,.72);
+        display: none; flex-direction: column; align-items: center; justify-content: center;
+        gap: 10px; text-align: center; padding: 10px;
+    }
+    .msgBox.show { display: flex; }
+    .msgBox .big { font-size: 24px; font-weight: bold; }
+    .msgBox button, .side button, .modal button.main {
+        padding: 9px 20px; font-size: 15px; border: none; border-radius: 8px; color: #fff; cursor: pointer; background: #ff9800;
+    }
+    #respawnMsg {
+        position: absolute; left: 0; right: 0; top: 40%; text-align: center; font-size: 20px;
+        font-weight: bold; text-shadow: 0 2px 4px #000; pointer-events: none; display: none;
+    }
+
+    .controls { display: grid; grid-template-columns: 60px 60px 60px; grid-template-rows: 50px 50px; gap: 6px; margin-top: 12px; }
+    .controls button {
+        font-size: 18px; border: none; border-radius: 8px; background: #4caf50; color: #fff;
+        cursor: pointer; user-select: none; touch-action: manipulation;
+    }
+    .controls button:active { filter: brightness(.8); }
+    #up { grid-column: 2; grid-row: 1; } #left { grid-column: 1; grid-row: 2; }
+    #down { grid-column: 2; grid-row: 2; } #right { grid-column: 3; grid-row: 2; }
+
+    .side { width: 250px; max-width: 100%; display: flex; flex-direction: column; gap: 10px; }
+    .panel { background: #2b2b40; border-radius: 10px; padding: 10px; }
+    .panel h3 { margin: 0 0 8px; font-size: 14px; color: #ffd166; }
+    .pl { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; font-size: 13px; }
+    .pl.me { background: #3f3f60; }
+    .pl.dead { opacity: .5; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; flex: none; }
+    .pl .sc { margin-left: auto; text-align: right; }
+    .pl .sc b { color: #ffd166; }
+    #events { font-size: 12px; color: #ccc; line-height: 1.6; min-height: 40px; }
+    #events div:last-child { color: #fff; }
+    .share { font-size: 12px; color: #ccc; }
+    .share #lanLink { word-break: break-all; }
+    .share b { color: #8bc34a; }
+    #leaveBtn { background: #607d8b; }
+
+    /* modals */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+    .overlay.show { display: flex; }
+    .modal { background: #2b2b40; border-radius: 12px; padding: 20px; width: 100%; max-width: 360px; max-height: 90vh; overflow-y: auto; }
+    .modal h2 { margin: 0 0 14px; font-size: 20px; }
+    .modal h3 { margin: 14px 0 8px; font-size: 15px; color: #ffd166; }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
+    .row label { font-size: 14px; }
+    .row input[type=number], .row input[type=text] { width: 120px; padding: 5px; border-radius: 6px; border: 1px solid #555; background: #1e1e2e; color: #fff; }
+    .colors { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    .colors div { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; }
+    .colors div.sel { border-color: #fff; }
+    .modal .btns { display: flex; gap: 8px; margin-top: 16px; }
+    .modal .btns button { flex: 1; padding: 9px; border: none; border-radius: 8px; color: #fff; font-size: 15px; cursor: pointer; }
+    #saveSet { background: #4caf50; } #resetSet { background: #f44336; } #closeSet { background: #607d8b; }
+    .hint { font-size: 12px; color: #aaa; margin: 4px 0 8px; }
+    .err { color: #ff6b6b; font-size: 13px; min-height: 16px; }
+</style>
+</head>
+<body>
+
+<div id="game">
+    <div class="topbar">
+        <h1>Multiplayer Snake</h1>
+        <button class="icon-btn" id="settingsBtn" title="Settings">&#9881;</button>
+        <button class="icon-btn" id="fullBtn" title="Full screen">&#x26F6;</button>
+    </div>
+    <div class="info">
+        Room: <span id="roomInfo">-</span> &nbsp;|&nbsp;
+        Your size: <span id="mySize">0</span> &nbsp;|&nbsp;
+        Score: <span id="myScore">0</span> &nbsp;|&nbsp;
+        Time: <span id="timeInfo">--:--</span>
+    </div>
+
+    <div class="main">
+        <div class="boardCol">
+            <div id="boardWrap">
+                <canvas id="board"></canvas>
+                <div id="respawnMsg"></div>
+                <div class="msgBox" id="msgBox">
+                    <div class="big" id="msgTitle"></div>
+                    <div id="msgText"></div>
+                    <div id="msgBtns" style="display:flex;gap:8px"></div>
+                </div>
+            </div>
+            <div class="controls">
+                <button id="up">&#9650;</button>
+                <button id="left">&#9664;</button>
+                <button id="down">&#9660;</button>
+                <button id="right">&#9654;</button>
+            </div>
+        </div>
+
+        <div class="side">
+            <div class="panel"><h3>Players</h3><div id="plist"></div></div>
+            <div class="panel"><h3>Events</h3><div id="events"></div></div>
+            <div class="panel share">
+                Other players open this page (any network):<br>
+                <b id="lanLink"></b><br>
+                and join room <b id="roomLink">main</b><br>
+                <span style="color:#aaa">The first player in a room hosts the game: keep that tab open.</span>
+            </div>
+            <button id="leaveBtn">Leave room</button>
+        </div>
+    </div>
+</div>
+
+<!-- Join modal -->
+<div class="overlay" id="joinBox">
+    <div class="modal">
+        <h2>Join game</h2>
+        <div class="row"><label>Your name</label><input type="text" id="jName" maxlength="16"></div>
+        <div class="row"><label>Room</label><input type="text" id="jRoom" maxlength="16" value="main"></div>
+        <div class="hint">Players in the same room play together, from any network. If nobody is in the room yet, you host it.</div>
+        <label style="font-size:14px">Snake color</label>
+        <div class="colors" id="jColors"></div>
+        <div class="err" id="jErr"></div>
+        <div class="btns"><button class="main" id="joinBtn" style="background:#4caf50">Join</button></div>
+    </div>
+</div>
+
+<!-- Settings modal -->
+<div class="overlay" id="settingsBox">
+    <div class="modal">
+        <h2>&#9881; Settings</h2>
+        <div class="hint" id="setNote"></div>
+
+        <h3>Board grid</h3>
+        <div class="row"><label>Grid X (columns)</label><input type="number" id="sCols" min="10" max="80"></div>
+        <div class="row"><label>Grid Y (rows)</label><input type="number" id="sRows" min="10" max="60"></div>
+
+        <h3>Snake</h3>
+        <div class="row"><label>Start length</label><input type="number" id="sLen" min="1" max="10"></div>
+        <div class="row"><label>Speed (ms per move)</label><input type="number" id="sSpeed" min="60" max="600" step="10"></div>
+        <div class="row"><label>Pass through walls</label><input type="checkbox" id="sWrap"></div>
+        <div class="row"><label>Respawn after dying</label><input type="checkbox" id="sRespawn"></div>
+        <div class="row"><label>Game time (min, 0 = no limit)</label><input type="number" id="sTime" min="0" max="30"></div>
+
+        <h3>Food</h3>
+        <div class="row"><label>Booster after every N foods</label><input type="number" id="sEvery" min="1" max="50"></div>
+        <div class="row"><label>Normal food points</label><input type="number" id="sNPt" min="1" max="100"></div>
+        <div class="row"><label>Booster points</label><input type="number" id="sBPt" min="1" max="100"></div>
+
+        <h3>This screen only</h3>
+        <div class="row"><label>Max cell size (px)</label><input type="number" id="sCell" min="6" max="40"></div>
+
+        <div class="btns">
+            <button id="saveSet">Save</button>
+            <button id="resetSet">Default</button>
+            <button id="closeSet">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- PeerJS: connects the players' browsers directly (no game server needed) -->
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+// ================== GAME ENGINE (runs in the HOST player's browser) ==================
+// The first player to open a room becomes its host: their browser keeps the game,
+// exactly like the PHP server did. Other players send their direction to the host
+// and ask for the latest game state many times a second.
+
+const DIRS = { U: [0, -1], D: [0, 1], L: [-1, 0], R: [1, 0] };
+const OPPOSITE = { U: 'D', D: 'U', L: 'R', R: 'L' };
+const TIMEOUT_MS = 10000; // player removed after 10 s without contact
+
+const nowMs = () => Date.now();
+const randomInt = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
+const randomHex = n => [...crypto.getRandomValues(new Uint8Array(n))].map(b => b.toString(16).padStart(2, '0')).join('');
+
+function defaultSettings() {
+    return {
+        cols: 30,          // grid X
+        rows: 20,          // grid Y
+        speed: 150,        // ms per move
+        startLen: 2,       // snake starts with 2 points
+        wrap: false,       // pass through walls
+        respawn: true,     // come back 3 s after dying
+        time: 3,           // game minutes (0 = no limit)
+        boosterEvery: 6,   // booster after every 6 normal foods (per player)
+        normalPoint: 1,
+        boosterPoint: 5,
+    };
+}
+
+function newRoom(settings) {
+    return {
+        status: 'lobby', settings: settings || defaultSettings(),
+        players: {}, order: [], foods: [],
+        lastTick: 0, endAt: 0, events: [], winner: null,
+    };
+}
+
+function newPlayer(name, color, key, now) {
+    return {
+        name, color, key, seen: now,
+        alive: false, body: [], dir: 'R', queue: [], grow: 0,
+        score: 0, kills: 0, deaths: 0, eaten: 0, respawnAt: 0,
+    };
+}
+
+function addEvent(S, msg) {
+    S.events.push(msg);
+    S.events = S.events.slice(-8);
+}
+
+function hostId(S) { return S.order[0] || null; }
+
+function occupied(S) {
+    const occ = {};
+    for (const p of Object.values(S.players)) for (const c of p.body) occ[c[0] + ',' + c[1]] = true;
+    for (const f of S.foods) occ[f.x + ',' + f.y] = true;
+    return occ;
+}
+
+function freeCell(S) {
+    const occ = occupied(S), st = S.settings;
+    for (let t = 0; t < 300; t++) {
+        const x = randomInt(0, st.cols - 1), y = randomInt(0, st.rows - 1);
+        if (!occ[x + ',' + y]) return [x, y];
+    }
+    return null;
+}
+
+function addFood(S, type) {
+    const c = freeCell(S);
+    if (c) S.foods.push({ x: c[0], y: c[1], t: type });
+}
+
+function refillFoods(S) {
+    const want = Math.max(2, Object.keys(S.players).length + 1);
+    const have = S.foods.filter(f => f.t === 'n').length;
+    for (let i = have; i < want; i++) addFood(S, 'n');
+}
+
+// put a snake on a free spot with 3 empty cells in front of it
+function spawn(S, id) {
+    const st = S.settings, len = st.startLen, occ = occupied(S), keys = Object.keys(DIRS);
+    for (let t = 0; t < 300; t++) {
+        const dk = keys[randomInt(0, 3)], [dx, dy] = DIRS[dk];
+        const x = randomInt(0, st.cols - 1), y = randomInt(0, st.rows - 1);
+        const body = []; let ok = true;
+        for (let i = -3; i < len; i++) {
+            const cx = x - dx * i, cy = y - dy * i;
+            if (cx < 0 || cy < 0 || cx >= st.cols || cy >= st.rows || occ[cx + ',' + cy]) { ok = false; break; }
+            if (i >= 0) body.push([cx, cy]);
+        }
+        if (ok) {
+            const p = S.players[id];
+            p.alive = true; p.body = body; p.dir = dk;
+            p.queue = []; p.grow = 0; p.respawnAt = 0;
+            return true;
+        }
+    }
+    return false;
+}
+
+function startGame(S, now) {
+    S.foods = [];
+    for (const p of Object.values(S.players)) {
+        p.score = p.kills = p.deaths = p.eaten = 0;
+        p.alive = false; p.body = []; p.respawnAt = 0;
+    }
+    for (const id of Object.keys(S.players)) spawn(S, id);
+    refillFoods(S);
+    S.status = 'playing';
+    S.lastTick = now;
+    S.endAt = S.settings.time > 0 ? now + S.settings.time * 60000 : 0;
+    S.winner = null;
+    S.events = [];
+    addEvent(S, 'Game started!');
+}
+
+function finishGame(S, why, winnerId = null) {
+    S.status = 'over';
+    if (winnerId === null) {
+        let best = -1;
+        for (const [id, p] of Object.entries(S.players)) {
+            const val = p.score * 1000 + p.body.length;
+            if (val > best) { best = val; winnerId = id; }
+        }
+    }
+    S.winner = winnerId && S.players[winnerId] ? S.players[winnerId].name : null;
+    addEvent(S, why + (S.winner ? ' — ' + S.winner + ' wins!' : ''));
+}
+
+const sameCell = (a, b) => a[0] === b[0] && a[1] === b[1];
+
+// ---- one game step ----
+function tick(S, now) {
+    const st = S.settings, C = st.cols, R = st.rows;
+    const newBody = {}, dead = {};
+
+    for (const [id, p] of Object.entries(S.players)) {
+        if (!p.alive) continue;
+        // next valid turn from the queue
+        while (p.queue.length) {
+            const d = p.queue.shift();
+            if (d !== p.dir && d !== OPPOSITE[p.dir]) { p.dir = d; break; }
+        }
+        const [dx, dy] = DIRS[p.dir];
+        let hx = p.body[0][0] + dx, hy = p.body[0][1] + dy;
+        if (st.wrap) { hx = (hx + C) % C; hy = (hy + R) % R; }
+        else if (hx < 0 || hy < 0 || hx >= C || hy >= R) { dead[id] = 'hit the wall'; continue; }
+        const b = [[hx, hy], ...p.body];
+        if (p.grow > 0) p.grow--; else b.pop();
+        newBody[id] = b;
+    }
+
+    // victim dies, eater gets the whole size of victim
+    const eat = (eater, victim, how = 'was eaten by') => {
+        const size = S.players[victim].body.length, en = S.players[eater].name;
+        dead[victim] = how + ' ' + en + ' (+' + size + ' to ' + en + ')';
+        S.players[eater].grow += size;
+        S.players[eater].score += size;
+        S.players[eater].kills++;
+    };
+
+    // head against head: longer snake eats the shorter one
+    const ids = Object.keys(newBody);
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+        const a = ids[i], b = ids[j];
+        if (dead[a] || dead[b]) continue;
+        if (!sameCell(newBody[a][0], newBody[b][0])) continue;
+        const la = newBody[a].length, lb = newBody[b].length;
+        if (la > lb) eat(a, b);
+        else if (lb > la) eat(b, a);
+        else { dead[a] = dead[b] = 'crashed head-on'; }
+    }
+
+    // head into a body
+    nextA: for (const [a, ba] of Object.entries(newBody)) {
+        if (dead[a]) continue;
+        const h = ba[0];
+        for (let k = 1; k < ba.length; k++) if (sameCell(h, ba[k])) { dead[a] = 'ran into itself'; continue nextA; }
+        for (const [b, bb] of Object.entries(newBody)) {
+            if (b === a || dead[b]) continue;
+            for (let k = 1; k < bb.length; k++) {
+                // my head touched another snake: I am dead, my size goes to that snake
+                if (sameCell(h, bb[k])) { eat(b, a, 'crashed into'); continue nextA; }
+            }
+        }
+    }
+
+    // food
+    for (const [id, b] of Object.entries(newBody)) {
+        if (dead[id]) continue;
+        const k = S.foods.findIndex(f => f.x === b[0][0] && f.y === b[0][1]);
+        if (k < 0) continue;
+        const f = S.foods.splice(k, 1)[0], p = S.players[id];
+        p.grow++;
+        if (f.t === 'b') {
+            p.score += st.boosterPoint;
+            addEvent(S, p.name + ' ate a booster +' + st.boosterPoint);
+        } else {
+            p.score += st.normalPoint;
+            p.eaten++;
+            if (p.eaten % st.boosterEvery === 0) addFood(S, 'b');
+        }
+    }
+
+    // apply moves and deaths
+    for (const [id, p] of Object.entries(S.players)) {
+        if (dead[id]) {
+            addEvent(S, p.name + ' ' + dead[id]);
+            p.alive = false; p.body = []; p.queue = []; p.grow = 0; p.deaths++;
+            p.respawnAt = st.respawn ? now + 3000 : 0;
+        } else if (newBody[id]) {
+            p.body = newBody[id];
+        }
+    }
+
+    // respawn
+    for (const [id, p] of Object.entries(S.players)) {
+        if (!p.alive && p.respawnAt > 0 && now >= p.respawnAt) spawn(S, id);
+    }
+    refillFoods(S);
+
+    // game end
+    if (st.time > 0 && now >= S.endAt) { finishGame(S, 'Time up'); return; }
+    if (!st.respawn) {
+        const alive = Object.keys(S.players).filter(id => S.players[id].alive);
+        const total = Object.keys(S.players).length;
+        if (total > 1 && alive.length <= 1) finishGame(S, 'Last snake standing', alive[0] || null);
+        else if (total === 1 && alive.length === 0) finishGame(S, 'Game over');
+    }
+}
+
+function update(S, now) {
+    if (S.status !== 'playing') return;
+    const sp = S.settings.speed;
+    if (now - S.lastTick > sp * 10) S.lastTick = now - sp; // nobody asked for a while
+    let n = 0;
+    while (now - S.lastTick >= sp && n < 5 && S.status === 'playing') {
+        S.lastTick += sp;
+        tick(S, now);
+        n++;
+    }
+}
+
+// returns the room to use (a fresh one when everybody has left)
+function cleanup(S, now) {
+    for (const [id, p] of Object.entries(S.players)) {
+        if (now - p.seen > TIMEOUT_MS) {
+            addEvent(S, p.name + ' left');
+            delete S.players[id];
+        }
+    }
+    S.order = S.order.filter(id => S.players[id]);
+    return Object.keys(S.players).length ? S : newRoom(S.settings);
+}
+
+function cleanSettings(inp, old) {
+    const n = (k, min, max) => inp[k] !== undefined && inp[k] !== '' && !isNaN(inp[k]) ? Math.max(min, Math.min(max, Math.trunc(+inp[k]))) : old[k];
+    return {
+        cols: n('cols', 10, 80), rows: n('rows', 10, 60), speed: n('speed', 60, 600),
+        startLen: n('startLen', 1, 10), wrap: String(inp.wrap) === '1', respawn: String(inp.respawn) === '1',
+        time: n('time', 0, 30), boosterEvery: n('boosterEvery', 1, 50),
+        normalPoint: n('normalPoint', 1, 100), boosterPoint: n('boosterPoint', 1, 100),
+    };
+}
+
+// what each browser receives (never the secret keys)
+function view(S, me, now) {
+    const players = S.order.map(id => {
+        const p = S.players[id];
+        return {
+            id, name: p.name, color: p.color, alive: p.alive,
+            body: p.body, score: p.score, kills: p.kills, deaths: p.deaths,
+            respawnIn: p.respawnAt ? Math.max(0, p.respawnAt - now) : 0,
+        };
+    });
+    return JSON.parse(JSON.stringify({
+        me, host: hostId(S), status: S.status, settings: S.settings,
+        players, foods: S.foods, events: S.events, winner: S.winner,
+        remain: S.endAt ? Math.max(0, S.endAt - now) : null,
+    }));
+}
+
+// Room = { S } so the room can be replaced by cleanup / leave
+function handle(room, inp) {
+    const now = nowMs(), a = inp.action || '';
+    room.S = cleanup(room.S, now);
+    const S = room.S;
+
+    if (a === 'join') {
+        const name = Array.from(String(inp.name || '')).slice(0, 16).join('').trim() || 'Player';
+        const color = /^#[0-9a-f]{6}$/i.test(inp.color || '') ? inp.color : '#4caf50';
+        if (Object.keys(S.players).length >= 8) return { error: 'Room is full (8 players).' };
+        const id = 'p' + randomHex(4), key = randomHex(8);
+        S.players[id] = newPlayer(name, color, key, now);
+        S.order.push(id);
+        if (S.status === 'playing' && S.settings.respawn) S.players[id].respawnAt = now + 1000;
+        addEvent(S, name + ' joined');
+        return Object.assign({ id, key }, view(S, id, now));
+    }
+
+    const id = String(inp.id || '');
+    if (!S.players[id] || S.players[id].key !== String(inp.key || '')) return { error: 'not_joined' };
+    S.players[id].seen = now;
+    const isHost = hostId(S) === id;
+
+    switch (a) {
+        case 'dir': {
+            const d = inp.d || '';
+            if (DIRS[d] && S.players[id].queue.length < 3) S.players[id].queue.push(d);
+            break;
+        }
+        case 'settings':
+            if (isHost && S.status !== 'playing') S.settings = cleanSettings(inp, S.settings);
+            break;
+        case 'start':
+            if (isHost && S.status !== 'playing') startGame(S, now);
+            break;
+        case 'lobby':
+            if (isHost && S.status === 'over') S.status = 'lobby';
+            break;
+        case 'leave':
+            addEvent(S, S.players[id].name + ' left');
+            delete S.players[id];
+            S.order = S.order.filter(x => x !== id);
+            if (!Object.keys(S.players).length) room.S = newRoom(S.settings);
+            return { ok: true };
+    }
+    update(S, now);
+    return view(S, id, now);
+}
+
+// ================== PAGE ==================
+const COLORS = ['#4caf50', '#e53935', '#1e88e5', '#fdd835', '#8e24aa', '#ff9800', '#00bcd4', '#ec407a'];
+const DEFAULTS = defaultSettings();
+const $ = id => document.getElementById(id);
+const canvas = $('board'), ctx = canvas.getContext('2d');
+
+let me = null;          // {id, key, room}
+let S = null;           // last state from server
+let cell = 16;
+let maxCell = 20;
+let polling = false, lastErr = 0;
+
+// ---------- small storage helpers ----------
+function store(k, v) { try { v === null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function load(k) { try { return JSON.parse(sessionStorage.getItem(k)); } catch (e) { return null; } }
+function lsGet(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+maxCell = lsGet('snakeMultyCell', 20);
+
+// ---------- connection (PeerJS) ----------
+// Room "abc" = peer id PEER_PREFIX + "abc". Whoever gets that id first is the host.
+const PEER_PREFIX = 'av73-snake-multy-';
+let net = null;   // { role: 'host', peer, state } or { role: 'client', peer, conn, pending, seq }
+
+function openPeer(id) {
+    return new Promise((resolve, reject) => {
+        const p = id ? new Peer(id, { debug: 0 }) : new Peer({ debug: 0 });
+        const onErr = e => { p.destroy(); reject(e); };
+        p.once('open', () => { p.off('error', onErr); resolve(p); });
+        p.once('error', onErr);
+    });
+}
+
+function disconnect() {
+    if (!net) return;
+    const n = net; net = null;
+    Object.values(n.pending || {}).forEach(p => p.rej(new Error('closed')));
+    try { n.peer.destroy(); } catch (e) {}
+}
+
+async function connect(room) {
+    if (typeof Peer === 'undefined') throw new Error('Could not load the connection library. Check your internet connection.');
+    disconnect();
+    const hid = PEER_PREFIX + room;
+
+    // 1) try to become the host of this room
+    try {
+        const peer = await openPeer(hid);
+        const n = { role: 'host', peer, state: { S: newRoom() } };
+        peer.on('connection', c => {
+            c.on('data', m => {
+                if (!m || !m.rid || net !== n) return;
+                let res;
+                try { res = handle(n.state, m.body || {}); } catch (e) { res = { error: 'server' }; }
+                c.send({ rid: m.rid, res });
+            });
+        });
+        peer.on('disconnected', () => { if (net === n && !peer.destroyed) peer.reconnect(); });
+        net = n;
+        return;
+    } catch (e) {
+        if (e.type !== 'unavailable-id') throw new Error('Cannot reach the connection server (' + (e.type || e.message) + ').');
+    }
+
+    // 2) someone already hosts it: join them
+    const peer = await openPeer(null);
+    const conn = peer.connect(hid, { reliable: true });
+    await new Promise((resolve, reject) => {
+        const fail = msg => { clearTimeout(t); peer.destroy(); reject(new Error(msg)); };
+        const t = setTimeout(() => fail('The room host did not answer. Try again in a few seconds.'), 10000);
+        conn.on('open', () => { clearTimeout(t); resolve(); });
+        conn.on('error', () => fail('Could not connect to the room host.'));
+        peer.on('error', e => { if (e.type === 'peer-unavailable') fail('The room host has just left. Try again in a few seconds.'); });
+    });
+    const n = { role: 'client', peer, conn, pending: {}, seq: 0 };
+    conn.on('data', m => { const p = m && n.pending[m.rid]; if (p) { delete n.pending[m.rid]; p.res(m.res); } });
+    conn.on('close', () => { if (net === n) hostGone(); });
+    net = n;
+}
+
+function hostGone() {
+    disconnect();
+    me = null; S = null; store('snakeMulty', null);
+    showJoin();
+    $('jErr').textContent = 'The host left the room. Join again: the first player to join becomes the new host.';
+}
+addEventListener('pagehide', () => { if (net) try { net.peer.destroy(); } catch (e) {} });
+
+// ---------- game calls (same actions as the old PHP server) ----------
+async function api(action, extra = {}) {
+    const body = { action, room: me ? me.room : '', id: me ? me.id : '', key: me ? me.key : '', ...extra };
+    if (!net) throw new Error('offline');
+    if (net.role === 'host') return handle(net.state, body);
+    const n = net;
+    return new Promise((res, rej) => {
+        const rid = ++n.seq;
+        const t = setTimeout(() => { delete n.pending[rid]; rej(new Error('timeout')); }, 4000);
+        n.pending[rid] = { res: v => { clearTimeout(t); res(v); }, rej: e => { clearTimeout(t); rej(e); } };
+        n.conn.send({ rid, body });
+    });
+}
+
+function gotState(r) {
+    if (!r) return;
+    if (r.error === 'not_joined') { me = null; store('snakeMulty', null); showJoin(); return; }
+    if (r.error) return;
+    S = r;
+    render();
+}
+
+async function pollLoop() {
+    if (polling) return;
+    polling = true;
+    while (me) {
+        try { gotState(await api('poll')); lastErr = 0; }
+        catch (e) { lastErr++; }
+        const wait = S && S.status === 'playing' ? Math.max(40, S.settings.speed / 2.5) : 500;
+        await new Promise(r => setTimeout(r, lastErr ? 1000 : wait));
+    }
+    polling = false;
+}
+
+// ---------- join ----------
+let pickedColor = lsGet('snakeMultyColor', COLORS[0]);
+function showJoin() {
+    $('jName').value = lsGet('snakeMultyName', '');
+    $('jRoom').value = lsGet('snakeMultyRoom', 'main');
+    $('jColors').innerHTML = COLORS.map(c => `<div style="background:${c}" data-c="${c}" class="${c === pickedColor ? 'sel' : ''}"></div>`).join('');
+    $('jErr').textContent = '';
+    $('joinBox').classList.add('show');
+    setTimeout(() => $('jName').focus(), 50);
+}
+$('jColors').onclick = e => {
+    if (!e.target.dataset.c) return;
+    pickedColor = e.target.dataset.c;
+    [...$('jColors').children].forEach(d => d.classList.toggle('sel', d.dataset.c === pickedColor));
+};
+$('joinBtn').onclick = async () => {
+    const name = $('jName').value.trim() || 'Player';
+    const room = ($('jRoom').value.toLowerCase().replace(/[^a-z0-9]/g, '') || 'main').slice(0, 16);
+    lsSet('snakeMultyName', name); lsSet('snakeMultyRoom', room); lsSet('snakeMultyColor', pickedColor);
+    $('jErr').textContent = 'Connecting...';
+    $('joinBtn').disabled = true;
+    try {
+        me = { room, id: '', key: '' };
+        await connect(room);
+        const r = await api('join', { name, color: pickedColor });
+        if (r.error) { me = null; disconnect(); $('jErr').textContent = r.error; return; }
+        $('jErr').textContent = '';
+        me = { room, id: r.id, key: r.key };
+        store('snakeMulty', me);
+        $('joinBox').classList.remove('show');
+        gotState(r);
+        pollLoop();
+    } catch (e) { me = null; disconnect(); $('jErr').textContent = e.message || 'Cannot connect.'; }
+    finally { $('joinBtn').disabled = false; }
+};
+$('jName').addEventListener('keydown', e => { if (e.key === 'Enter') $('joinBtn').click(); });
+
+$('leaveBtn').onclick = async () => {
+    if (!me) return;
+    try { await api('leave'); } catch (e) {}
+    disconnect();
+    me = null; S = null; store('snakeMulty', null);
+    showJoin();
+};
+
+// ---------- drawing ----------
+function fit() {
+    if (!S) return;
+    const { cols, rows } = S.settings;
+    const full = document.fullscreenElement === $('game');
+    const availW = full ? window.innerWidth - 320 : Math.min(window.innerWidth - 40, 900);
+    const availH = full ? window.innerHeight - 220 : 600;
+    cell = Math.max(5, Math.floor(Math.min(availW / cols, availH / rows, full ? 60 : maxCell)));
+    if (canvas.width !== cols * cell || canvas.height !== rows * cell) {
+        canvas.width = cols * cell; canvas.height = rows * cell;
+    }
+}
+
+function render() {
+    fit();
+    const { cols, rows } = S.settings;
+    const C = cell;
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // light grid
+    ctx.strokeStyle = 'rgba(255,255,255,.04)';
+    ctx.beginPath();
+    for (let x = 1; x < cols; x++) { ctx.moveTo(x * C, 0); ctx.lineTo(x * C, canvas.height); }
+    for (let y = 1; y < rows; y++) { ctx.moveTo(0, y * C); ctx.lineTo(canvas.width, y * C); }
+    ctx.stroke();
+
+    // food
+    S.foods.forEach(f => {
+        if (f.t === 'b') {
+            ctx.fillStyle = '#ffd700';
+            ctx.beginPath(); ctx.arc(f.x * C + C / 2, f.y * C + C / 2, C / 2, 0, Math.PI * 2); ctx.fill();
+        } else {
+            ctx.fillStyle = '#ff4d4d';
+            ctx.fillRect(f.x * C + 1, f.y * C + 1, C - 2, C - 2);
+        }
+    });
+
+    // snakes
+    S.players.forEach(p => {
+        if (!p.alive || !p.body.length) return;
+        p.body.forEach((s, i) => {
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = i === 0 ? 1 : 0.85;
+            ctx.fillRect(s[0] * C, s[1] * C, C - 1, C - 1);
+        });
+        ctx.globalAlpha = 1;
+        const h = p.body[0];
+        // eyes
+        ctx.fillStyle = '#fff';
+        const e = Math.max(1.5, C / 6);
+        ctx.fillRect(h[0] * C + C * .2, h[1] * C + C * .2, e, e);
+        ctx.fillRect(h[0] * C + C * .65, h[1] * C + C * .2, e, e);
+        // my snake outline
+        if (p.id === S.me) {
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+            ctx.strokeRect(h[0] * C + 1, h[1] * C + 1, C - 3, C - 3);
+        }
+        // name tag
+        ctx.font = 'bold ' + Math.max(10, Math.min(14, C * .8)) + 'px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(p.name, h[0] * C + C / 2, h[1] * C - 3 < 10 ? h[1] * C + C * 2 : h[1] * C - 3);
+    });
+
+    canvas.style.borderColor = (S.players.find(p => p.id === S.me) || {}).color || '#4caf50';
+    renderSide();
+    renderMsg();
+}
+
+function fmt(ms) { const s = Math.ceil(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+
+function renderSide() {
+    const mine = S.players.find(p => p.id === S.me);
+    $('roomInfo').textContent = me ? me.room + (net && net.role === 'host' ? ' (you host)' : '') : '-';
+    $('roomLink').textContent = me ? me.room : 'main';
+    $('mySize').textContent = mine ? mine.body.length : 0;
+    $('myScore').textContent = mine ? mine.score : 0;
+    $('timeInfo').textContent = S.remain === null ? 'no limit' : fmt(S.remain);
+
+    const ranked = [...S.players].sort((a, b) => b.score - a.score || b.body.length - a.body.length);
+    $('plist').innerHTML = ranked.map(p => `
+        <div class="pl ${p.id === S.me ? 'me' : ''} ${p.alive || S.status !== 'playing' ? '' : 'dead'}">
+            <div class="dot" style="background:${p.color}"></div>
+            <div>${p.id === S.host ? '&#128081; ' : ''}${esc(p.name)}${p.id === S.me ? ' (you)' : ''}<br>
+                <small style="color:#aaa">${S.status === 'playing' ? (p.alive ? 'size ' + p.body.length : (p.respawnIn ? 'back in ' + Math.ceil(p.respawnIn / 1000) + 's' : 'out')) : 'ready'}</small></div>
+            <div class="sc"><b>${p.score}</b><br><small style="color:#aaa">&#9876; ${p.kills}</small></div>
+        </div>`).join('');
+    $('events').innerHTML = S.events.map(e => '<div>' + esc(e) + '</div>').join('') || '<div style="color:#888">-</div>';
+}
+
+function renderMsg() {
+    const box = $('msgBox'), isHost = S.host === S.me;
+    const mine = S.players.find(p => p.id === S.me);
+    let title = '', text = '', btns = '';
+    if (S.status === 'lobby') {
+        title = 'Waiting for players';
+        text = S.players.length + ' player(s) in room <b>' + esc(me.room) + '</b><br>' +
+            (isHost ? 'You are the host. Change settings with &#9881; then press Start.' : 'Waiting for the host to start...');
+        if (isHost) btns = '<button onclick="hostAction(\'start\')">Start Game</button>';
+    } else if (S.status === 'over') {
+        title = S.winner ? '&#127942; ' + esc(S.winner) + ' wins!' : 'Game over';
+        const ranked = [...S.players].sort((a, b) => b.score - a.score);
+        text = ranked.map((p, i) => `${i + 1}. <span style="color:${p.color}">${esc(p.name)}</span> — ${p.score} pts`).join('<br>');
+        if (isHost) btns = '<button onclick="hostAction(\'start\')">Play Again</button><button style="background:#607d8b" onclick="hostAction(\'lobby\')">Lobby</button>';
+        else text += '<br><br>Waiting for the host...';
+    }
+    $('msgTitle').innerHTML = title;
+    $('msgText').innerHTML = text;
+    $('msgBtns').innerHTML = btns;
+    box.classList.toggle('show', S.status !== 'playing');
+
+    const rm = $('respawnMsg');
+    if (S.status === 'playing' && mine && !mine.alive) {
+        rm.style.display = 'block';
+        rm.textContent = mine.respawnIn ? 'You are back in ' + Math.ceil(mine.respawnIn / 1000) + 's' : 'You are out — watching';
+    } else rm.style.display = 'none';
+}
+
+async function hostAction(a) { try { gotState(await api(a)); } catch (e) {} }
+
+// ---------- controls ----------
+function turn(d) {
+    if (!me || !S || S.status !== 'playing') return;
+    api('dir', { d }).then(gotState).catch(() => {});
+}
+$('up').onclick = () => turn('U');
+$('down').onclick = () => turn('D');
+$('left').onclick = () => turn('L');
+$('right').onclick = () => turn('R');
+document.addEventListener('keydown', e => {
+    if ($('joinBox').classList.contains('show') || $('settingsBox').classList.contains('show')) return;
+    const k = { ArrowUp: 'U', ArrowDown: 'D', ArrowLeft: 'L', ArrowRight: 'R', w: 'U', s: 'D', a: 'L', d: 'R', W: 'U', S: 'D', A: 'L', D: 'R' }[e.key];
+    if (k) { e.preventDefault(); turn(k); }
+    else if (e.key === 'f' || e.key === 'F') $('fullBtn').onclick();
+});
+// swipe on phones
+let touch = null;
+canvas.addEventListener('touchstart', e => { const t = e.touches[0]; touch = [t.clientX, t.clientY]; }, { passive: true });
+canvas.addEventListener('touchend', e => {
+    if (!touch) return;
+    const t = e.changedTouches[0], dx = t.clientX - touch[0], dy = t.clientY - touch[1];
+    touch = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+    turn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'R' : 'L') : (dy > 0 ? 'D' : 'U'));
+});
+
+// ---------- settings ----------
+function fillForm(s) {
+    $('sCols').value = s.cols; $('sRows').value = s.rows; $('sLen').value = s.startLen;
+    $('sSpeed').value = s.speed; $('sWrap').checked = s.wrap; $('sRespawn').checked = s.respawn;
+    $('sTime').value = s.time; $('sEvery').value = s.boosterEvery;
+    $('sNPt').value = s.normalPoint; $('sBPt').value = s.boosterPoint;
+}
+$('settingsBtn').onclick = () => {
+    if (!S) return;
+    fillForm(S.settings);
+    $('sCell').value = maxCell;
+    const canEdit = S.host === S.me && S.status !== 'playing';
+    $('setNote').innerHTML = canEdit ? 'You are the host: game settings apply to everyone in the room.'
+        : (S.host !== S.me ? 'Only the host (&#128081;) can change game settings.' : 'Game settings can be changed after this game ends.');
+    document.querySelectorAll('#settingsBox input').forEach(i => { if (i.id !== 'sCell') i.disabled = !canEdit; });
+    $('resetSet').disabled = !canEdit; $('resetSet').style.opacity = canEdit ? 1 : .5;
+    $('settingsBox').classList.add('show');
+};
+$('resetSet').onclick = () => fillForm(DEFAULTS);
+$('closeSet').onclick = () => $('settingsBox').classList.remove('show');
+$('settingsBox').onclick = e => { if (e.target.id === 'settingsBox') $('closeSet').onclick(); };
+$('saveSet').onclick = async () => {
+    maxCell = Math.max(6, Math.min(40, parseInt($('sCell').value, 10) || 20));
+    lsSet('snakeMultyCell', maxCell);
+    if (S && S.host === S.me && S.status !== 'playing') {
+        try {
+            gotState(await api('settings', {
+                cols: $('sCols').value, rows: $('sRows').value, startLen: $('sLen').value, speed: $('sSpeed').value,
+                wrap: $('sWrap').checked ? 1 : 0, respawn: $('sRespawn').checked ? 1 : 0, time: $('sTime').value,
+                boosterEvery: $('sEvery').value, normalPoint: $('sNPt').value, boosterPoint: $('sBPt').value,
+            }));
+        } catch (e) {}
+    }
+    $('settingsBox').classList.remove('show');
+    if (S) render();
+};
+
+// ---------- full screen ----------
+$('fullBtn').onclick = () => {
+    if (!document.fullscreenElement) { if ($('game').requestFullscreen) $('game').requestFullscreen().catch(() => {}); }
+    else document.exitFullscreen();
+};
+document.addEventListener('fullscreenchange', () => {
+    ['settingsBox', 'joinBox'].forEach(id => (document.fullscreenElement || document.body).appendChild($(id)));
+    $('fullBtn').innerHTML = document.fullscreenElement ? '&#x2715;' : '&#x26F6;';
+    $('fullBtn').title = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+    if (S) render();
+});
+window.addEventListener('resize', () => { if (S) render(); });
+
+// ---------- start ----------
+canvas.width = 30 * 16; canvas.height = 20 * 16;
+ctx.fillStyle = '#111'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+$('lanLink').textContent = location.origin + location.pathname;
+me = load('snakeMulty');
+if (me && me.id) connect(me.room).then(pollLoop).catch(() => { me = null; store('snakeMulty', null); showJoin(); });
+else showJoin();
+</script>
+</body>
+</html>

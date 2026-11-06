@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snake Game</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        font-family: Arial, sans-serif;
+        background: #1e1e2e;
+        color: #fff;
+        margin: 0;
+        padding: 20px 16px;
+    }
+    #game {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: #1e1e2e;
+        padding: 10px;
+    }
+    #game:fullscreen { justify-content: center; height: 100vh; width: 100vw; }
+    .topbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+    }
+    h1 { margin: 0; font-size: 24px; }
+    .icon-btn {
+        width: 38px; height: 38px;
+        border: none; border-radius: 8px;
+        background: #3a3a55; color: #fff;
+        font-size: 20px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .icon-btn:hover { background: #4a4a70; }
+    .info { margin-bottom: 6px; font-size: 15px; text-align: center; }
+    .info span { font-weight: bold; color: #ffd166; }
+    canvas {
+        background: #111;
+        border: 3px solid #4caf50;
+        image-rendering: pixelated;
+        max-width: 100%;
+    }
+    .controls {
+        display: grid;
+        grid-template-columns: 60px 60px 60px;
+        grid-template-rows: 50px 50px;
+        gap: 6px;
+        margin-top: 12px;
+    }
+    .controls button {
+        font-size: 18px; border: none; border-radius: 8px;
+        background: #4caf50; color: #fff; cursor: pointer; user-select: none;
+        touch-action: manipulation;
+    }
+    .controls button:active { background: #388e3c; }
+    #up    { grid-column: 2; grid-row: 1; }
+    #left  { grid-column: 1; grid-row: 2; }
+    #down  { grid-column: 2; grid-row: 2; }
+    #right { grid-column: 3; grid-row: 2; }
+    .actions { display: flex; gap: 8px; margin-top: 10px; }
+    .actions button {
+        padding: 8px 20px; font-size: 16px; border: none; border-radius: 8px;
+        color: #fff; cursor: pointer;
+    }
+    #startBtn { background: #ff9800; }
+    #pauseBtn { background: #607d8b; }
+    #msg { margin-top: 6px; height: 20px; color: #ff6b6b; font-weight: bold; }
+
+    /* Settings modal */
+    .overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,.6);
+        display: none; align-items: center; justify-content: center; z-index: 10;
+        padding: 16px;
+    }
+    .overlay.show { display: flex; }
+    .modal {
+        background: #2b2b40; border-radius: 12px; padding: 20px;
+        width: 100%; max-width: 340px; max-height: 90vh; overflow-y: auto;
+    }
+    .modal h2 { margin: 0 0 14px; font-size: 20px; }
+    .modal h3 { margin: 14px 0 8px; font-size: 15px; color: #ffd166; }
+    .row {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 10px; gap: 10px;
+    }
+    .row label { font-size: 14px; }
+    .row input[type=number] {
+        width: 80px; padding: 5px; border-radius: 6px; border: 1px solid #555;
+        background: #1e1e2e; color: #fff;
+    }
+    .row input[type=color] { width: 50px; height: 30px; border: none; background: none; }
+    .modal .btns { display: flex; gap: 8px; margin-top: 16px; }
+    .modal .btns button {
+        flex: 1; padding: 9px; border: none; border-radius: 8px;
+        color: #fff; font-size: 15px; cursor: pointer;
+    }
+    #saveSet { background: #4caf50; }
+    #resetSet { background: #f44336; }
+    #closeSet { background: #607d8b; }
+    .hint { font-size: 12px; color: #aaa; }
+</style>
+</head>
+<body>
+
+<div id="game">
+    <div class="topbar">
+        <h1>Snake Game</h1>
+        <button class="icon-btn" id="settingsBtn" title="Settings">&#9881;</button>
+        <button class="icon-btn" id="fullBtn" title="Full screen">&#x26F6;</button>
+    </div>
+
+    <div class="info">
+        Score: <span id="score">0</span> &nbsp;|&nbsp;
+        Length: <span id="length">0</span> &nbsp;|&nbsp;
+        High: <span id="high">0</span>
+    </div>
+    <div class="info" style="font-size:13px">
+        Board: <span id="boardInfo"></span> &nbsp;
+        Red = <span id="nPt"></span> pt &nbsp; Gold = <span id="bPt"></span> pts
+    </div>
+
+    <canvas id="board"></canvas>
+    <div id="msg"></div>
+
+    <div class="controls">
+        <button id="up">&#9650;</button>
+        <button id="left">&#9664;</button>
+        <button id="down">&#9660;</button>
+        <button id="right">&#9654;</button>
+    </div>
+    <div class="actions">
+        <button id="startBtn">Start</button>
+        <button id="pauseBtn">Pause</button>
+    </div>
+</div>
+
+<!-- Settings modal -->
+<div class="overlay" id="settingsBox">
+    <div class="modal">
+        <h2>&#9881; Settings</h2>
+
+        <h3>Board grid</h3>
+        <div class="row"><label>Grid X (columns)</label><input type="number" id="sCols" min="5" max="100"></div>
+        <div class="row"><label>Grid Y (rows)</label><input type="number" id="sRows" min="5" max="100"></div>
+        <div class="row"><label>Cell size (px)</label><input type="number" id="sCell" min="4" max="40"></div>
+        <div class="hint" id="sizeHint"></div>
+
+        <h3>Snake</h3>
+        <div class="row"><label>Start length</label><input type="number" id="sLen" min="1" max="20"></div>
+        <div class="row"><label>Speed (ms per move, lower = faster)</label><input type="number" id="sSpeed" min="40" max="1000" step="10"></div>
+        <div class="row"><label>Head color</label><input type="color" id="sHead"></div>
+        <div class="row"><label>Body color</label><input type="color" id="sBody"></div>
+        <div class="row"><label>Pass through walls</label><input type="checkbox" id="sWrap"></div>
+
+        <h3>Food</h3>
+        <div class="row"><label>Booster after every N foods</label><input type="number" id="sEvery" min="1" max="50"></div>
+        <div class="row"><label>Normal food points</label><input type="number" id="sNPt" min="1" max="100"></div>
+        <div class="row"><label>Booster points</label><input type="number" id="sBPt" min="1" max="100"></div>
+
+        <div class="btns">
+            <button id="saveSet">Save</button>
+            <button id="resetSet">Default</button>
+            <button id="closeSet">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ---- Default game settings ----
+const DEFAULTS = {
+    cols: 20,           // grid X (cells)
+    rows: 20,           // grid Y (cells)  -> 20 x 20 cells * 10px = 200 x 200 board
+    cell: 10,           // cell size in px
+    startLength: 2,     // snake starts with 2 points
+    speed: 150,         // ms per move
+    boosterEvery: 6,    // booster appears after every 6 normal foods
+    normalPoint: 1,
+    boosterPoint: 5,
+    wrap: false,        // pass through walls
+    snakeColor: '#4caf50',
+    headColor: '#8bc34a',
+};
+// High score is kept in this browser (localStorage)
+function getHigh() { try { return parseInt(localStorage.getItem('snakeHigh'), 10) || 0; } catch (e) { return 0; } }
+function saveHigh(s) { const h = Math.max(getHigh(), s); try { localStorage.setItem('snakeHigh', h); } catch (e) {} return h; }
+let cfg = loadCfg();
+
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const $ = id => document.getElementById(id);
+
+let snake, dir, nextDir, food, booster, score, normalEaten, timer, running = false, paused = false;
+
+// ---------- settings storage ----------
+function loadCfg() {
+    try {
+        const saved = JSON.parse(localStorage.getItem('snakeCfg') || '{}');
+        return Object.assign({}, DEFAULTS, saved);
+    } catch (e) { return Object.assign({}, DEFAULTS); }
+}
+function saveCfg() {
+    try { localStorage.setItem('snakeCfg', JSON.stringify(cfg)); } catch (e) {}
+}
+function clamp(v, min, max, def) {
+    v = parseInt(v, 10);
+    if (isNaN(v)) return def;
+    return Math.min(max, Math.max(min, v));
+}
+
+// ---------- board ----------
+function applyBoard() {
+    canvas.width  = cfg.cols * cfg.cell;
+    canvas.height = cfg.rows * cfg.cell;
+    canvas.style.borderColor = cfg.snakeColor;
+    $('boardInfo').textContent = cfg.cols + ' x ' + cfg.rows + ' (' + canvas.width + ' x ' + canvas.height + ' px)';
+    $('nPt').textContent = cfg.normalPoint;
+    $('bPt').textContent = cfg.boosterPoint;
+    fitCanvas();
+}
+
+// scale canvas to fit screen (mainly for full screen)
+function fitCanvas() {
+    const isFull = document.fullscreenElement === $('game');
+    if (!isFull) {
+        canvas.style.width = canvas.width + 'px';
+        canvas.style.height = canvas.height + 'px';
+        return;
+    }
+    // leave room for header, info, buttons
+    const availW = window.innerWidth - 40;
+    const availH = window.innerHeight - 290;
+    const scale = Math.max(1, Math.min(availW / canvas.width, availH / canvas.height));
+    canvas.style.width  = Math.floor(canvas.width * scale) + 'px';
+    canvas.style.height = Math.floor(canvas.height * scale) + 'px';
+}
+
+// ---------- game ----------
+function reset() {
+    applyBoard();
+    const midX = Math.floor(cfg.cols / 2), midY = Math.floor(cfg.rows / 2);
+    snake = [];
+    const len = Math.min(cfg.startLength, midX + 1);
+    for (let i = 0; i < len; i++) snake.push({ x: midX - i, y: midY });
+    dir = { x: 1, y: 0 };
+    nextDir = dir;
+    score = 0;
+    normalEaten = 0;
+    booster = null;
+    food = null;
+    food = randomFree();
+    updateInfo();
+    $('msg').textContent = '';
+    draw();
+}
+
+function randomFree() {
+    const free = [];
+    for (let x = 0; x < cfg.cols; x++)
+        for (let y = 0; y < cfg.rows; y++)
+            if (!snake.some(s => s.x === x && s.y === y) &&
+                !(food && food.x === x && food.y === y) &&
+                !(booster && booster.x === x && booster.y === y))
+                free.push({ x, y });
+    return free.length ? free[Math.floor(Math.random() * free.length)] : null;
+}
+
+function setDir(x, y) {
+    if (dir.x === -x && dir.y === -y) return; // no reverse
+    nextDir = { x, y };
+}
+
+function step() {
+    dir = nextDir;
+    let head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+    if (cfg.wrap) {
+        head.x = (head.x + cfg.cols) % cfg.cols;
+        head.y = (head.y + cfg.rows) % cfg.rows;
+    } else if (head.x < 0 || head.y < 0 || head.x >= cfg.cols || head.y >= cfg.rows) {
+        return gameOver();
+    }
+    if (snake.some(s => s.x === head.x && s.y === head.y)) return gameOver();
+
+    snake.unshift(head);
+    let grow = false;
+
+    if (food && head.x === food.x && head.y === food.y) {
+        score += cfg.normalPoint;
+        normalEaten++;
+        grow = true;
+        food = randomFree();
+        if (normalEaten % cfg.boosterEvery === 0 && !booster) booster = randomFree();
+    } else if (booster && head.x === booster.x && head.y === booster.y) {
+        score += cfg.boosterPoint;
+        grow = true;
+        booster = null;
+    }
+    if (!grow) snake.pop(); // every eat = +1 length
+
+    updateInfo();
+    draw();
+    if (!food && !booster) gameOver(true);
+}
+
+function draw() {
+    const C = cfg.cell;
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (food) {
+        ctx.fillStyle = '#ff4d4d';
+        ctx.fillRect(food.x * C, food.y * C, C, C);
+    }
+    if (booster) {
+        ctx.fillStyle = '#ffd700';
+        ctx.beginPath();
+        ctx.arc(booster.x * C + C / 2, booster.y * C + C / 2, C / 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    snake.forEach((s, i) => {
+        ctx.fillStyle = i === 0 ? cfg.headColor : cfg.snakeColor;
+        ctx.fillRect(s.x * C, s.y * C, C - 1, C - 1);
+    });
+
+    if (paused) {
+        ctx.fillStyle = 'rgba(0,0,0,.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold ' + Math.max(12, Math.floor(canvas.width / 10)) + 'px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+    }
+}
+
+function updateInfo() {
+    $('score').textContent = score;
+    $('length').textContent = snake.length;
+}
+
+function start() {
+    reset();
+    clearInterval(timer);
+    timer = setInterval(step, cfg.speed);
+    running = true;
+    paused = false;
+    $('startBtn').textContent = 'Restart';
+    $('pauseBtn').textContent = 'Pause';
+}
+
+function togglePause(force) {
+    if (!running) return;
+    paused = force !== undefined ? force : !paused;
+    clearInterval(timer);
+    if (!paused) timer = setInterval(step, cfg.speed);
+    $('pauseBtn').textContent = paused ? 'Resume' : 'Pause';
+    draw();
+}
+
+function gameOver(win) {
+    clearInterval(timer);
+    running = false;
+    $('msg').textContent = (win ? 'You Win! Score: ' : 'Game Over! Score: ') + score;
+    $('high').textContent = saveHigh(score);
+}
+
+// ---------- settings modal ----------
+function openSettings() {
+    togglePause(true);
+    fillForm(cfg);
+    $('settingsBox').classList.add('show');
+}
+function fillForm(cfg) {
+    $('sCols').value = cfg.cols;
+    $('sRows').value = cfg.rows;
+    $('sCell').value = cfg.cell;
+    $('sLen').value = cfg.startLength;
+    $('sSpeed').value = cfg.speed;
+    $('sHead').value = cfg.headColor;
+    $('sBody').value = cfg.snakeColor;
+    $('sWrap').checked = cfg.wrap;
+    $('sEvery').value = cfg.boosterEvery;
+    $('sNPt').value = cfg.normalPoint;
+    $('sBPt').value = cfg.boosterPoint;
+    updateHint();
+}
+function closeSettings() {
+    $('settingsBox').classList.remove('show');
+}
+function updateHint() {
+    const c = clamp($('sCols').value, 5, 100, cfg.cols);
+    const r = clamp($('sRows').value, 5, 100, cfg.rows);
+    const s = clamp($('sCell').value, 4, 40, cfg.cell);
+    $('sizeHint').textContent = 'Board size: ' + (c * s) + ' x ' + (r * s) + ' px';
+}
+['sCols', 'sRows', 'sCell'].forEach(id => $(id).addEventListener('input', updateHint));
+
+$('saveSet').onclick = () => {
+    cfg.cols         = clamp($('sCols').value, 5, 100, DEFAULTS.cols);
+    cfg.rows         = clamp($('sRows').value, 5, 100, DEFAULTS.rows);
+    cfg.cell         = clamp($('sCell').value, 4, 40, DEFAULTS.cell);
+    cfg.startLength  = clamp($('sLen').value, 1, 20, DEFAULTS.startLength);
+    cfg.speed        = clamp($('sSpeed').value, 40, 1000, DEFAULTS.speed);
+    cfg.boosterEvery = clamp($('sEvery').value, 1, 50, DEFAULTS.boosterEvery);
+    cfg.normalPoint  = clamp($('sNPt').value, 1, 100, DEFAULTS.normalPoint);
+    cfg.boosterPoint = clamp($('sBPt').value, 1, 100, DEFAULTS.boosterPoint);
+    cfg.headColor    = $('sHead').value;
+    cfg.snakeColor   = $('sBody').value;
+    cfg.wrap         = $('sWrap').checked;
+    saveCfg();
+    closeSettings();
+    clearInterval(timer);
+    running = false; paused = false;
+    $('startBtn').textContent = 'Start';
+    $('pauseBtn').textContent = 'Pause';
+    reset(); // new settings -> new game
+};
+$('resetSet').onclick = () => {
+    fillForm(DEFAULTS); // refill form with defaults (press Save to apply)
+};
+$('closeSet').onclick = () => { closeSettings(); togglePause(false); };
+$('settingsBox').onclick = e => { if (e.target.id === 'settingsBox') $('closeSet').onclick(); };
+
+// ---------- full screen ----------
+$('fullBtn').onclick = () => {
+    if (!document.fullscreenElement) {
+        ($('game').requestFullscreen ? $('game').requestFullscreen() : Promise.reject()).catch(() => {});
+    } else {
+        document.exitFullscreen();
+    }
+};
+document.addEventListener('fullscreenchange', () => {
+    // move modal inside fullscreen element so it stays visible
+    const box = $('settingsBox');
+    if (document.fullscreenElement) document.fullscreenElement.appendChild(box);
+    else document.body.appendChild(box);
+    $('fullBtn').innerHTML = document.fullscreenElement ? '&#x2715;' : '&#x26F6;';
+    $('fullBtn').title = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+    fitCanvas();
+});
+window.addEventListener('resize', fitCanvas);
+
+// ---------- controls ----------
+$('up').onclick    = () => setDir(0, -1);
+$('down').onclick  = () => setDir(0, 1);
+$('left').onclick  = () => setDir(-1, 0);
+$('right').onclick = () => setDir(1, 0);
+$('startBtn').onclick = start;
+$('pauseBtn').onclick = () => togglePause();
+$('settingsBtn').onclick = openSettings;
+
+document.addEventListener('keydown', e => {
+    if ($('settingsBox').classList.contains('show')) return;
+    const k = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[e.key];
+    if (k) { e.preventDefault(); setDir(k[0], k[1]); }
+    else if (e.key === ' ') { e.preventDefault(); running ? togglePause() : start(); }
+    else if (e.key === 'f' || e.key === 'F') $('fullBtn').onclick();
+});
+
+$('high').textContent = getHigh();
+reset();
+</script>
+</body>
+</html>

@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sudoku</title>
+<style>
+    * { box-sizing: border-box; }
+    :root { --accent: #4a90e2; --size: 450px; }
+    body {
+        font-family: Arial, sans-serif;
+        background: #1e1e2e; color: #fff;
+        margin: 0; padding: 20px 16px;
+    }
+    #game {
+        display: flex; flex-direction: column; align-items: center;
+        background: #1e1e2e; padding: 10px;
+    }
+    #game:fullscreen { justify-content: center; width: 100vw; height: 100vh; }
+    .topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    h1 { margin: 0; font-size: 24px; }
+    .icon-btn {
+        width: 38px; height: 38px; border: none; border-radius: 8px;
+        background: #3a3a55; color: #fff; font-size: 20px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .icon-btn:hover { background: #4a4a70; }
+    .info {
+        display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 14px;
+        width: var(--size); max-width: 100%; font-size: 14px; margin-bottom: 6px;
+    }
+    .info span { font-weight: bold; color: #ffd166; }
+
+    #board {
+        width: var(--size); height: var(--size); max-width: 100%;
+        display: grid; grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr);
+        border: 3px solid #ddd; background: #fff; user-select: none;
+        position: relative;
+    }
+    .cell {
+        position: relative;
+        display: flex; align-items: center; justify-content: center;
+        border-right: 1px solid #bbb; border-bottom: 1px solid #bbb;
+        color: var(--accent); background: #fff; cursor: pointer;
+        font-size: calc(var(--size) / 9 * 0.55);
+    }
+    .cell.colB { border-right: 2px solid #333; }
+    .cell.colLast { border-right: none; }
+    .cell.rowB { border-bottom: 2px solid #333; }
+    .cell.rowLast { border-bottom: none; }
+    .cell.given { color: #222; font-weight: bold; }
+    .cell.area { background: #e8eef7; }
+    .cell.same { background: #c9dbf3; }
+    .cell.sel { background: #a9c8f0; }
+    .cell.wrong { color: #e53935; background: #fde3e3; }
+    .cell.sel.wrong { background: #f7c4c4; }
+    .cell.flash { animation: flash .5s; }
+    @keyframes flash { 50% { background: #b9f6ca; } }
+    .notes {
+        position: absolute; inset: 1px;
+        display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+        font-size: calc(var(--size) / 9 * 0.24); color: #666; font-weight: normal;
+    }
+    .notes div { display: flex; align-items: center; justify-content: center; }
+
+    #overlayMsg {
+        position: absolute; inset: 0; background: rgba(0,0,0,.75);
+        display: none; flex-direction: column; align-items: center; justify-content: center;
+        color: #fff; font-size: 26px; font-weight: bold; gap: 12px; text-align: center;
+    }
+    #overlayMsg.show { display: flex; }
+    #overlayMsg button { font-size: 16px; padding: 8px 20px; border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; }
+
+    .tools { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
+    .tools button {
+        padding: 8px 14px; font-size: 14px; border: none; border-radius: 8px;
+        background: #3a3a55; color: #fff; cursor: pointer;
+    }
+    .tools button.on { background: var(--accent); }
+    .pad {
+        display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px;
+        width: var(--size); max-width: 100%; margin-top: 10px;
+    }
+    .pad button {
+        height: 48px; font-size: 22px; border: none; border-radius: 8px;
+        background: var(--accent); color: #fff; cursor: pointer; position: relative;
+        touch-action: manipulation; padding: 0;
+    }
+    .pad button small { position: absolute; bottom: 2px; right: 4px; font-size: 10px; opacity: .8; }
+    .pad button.done { visibility: hidden; }
+
+    /* Settings modal */
+    .overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,.6);
+        display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px;
+    }
+    .overlay.show { display: flex; }
+    .modal {
+        background: #2b2b40; border-radius: 12px; padding: 20px;
+        width: 100%; max-width: 360px; max-height: 90vh; overflow-y: auto;
+    }
+    .modal h2 { margin: 0 0 14px; font-size: 20px; }
+    .modal h3 { margin: 14px 0 8px; font-size: 15px; color: #ffd166; }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
+    .row label { font-size: 14px; }
+    .row input[type=number], .row select {
+        width: 100px; padding: 5px; border-radius: 6px; border: 1px solid #555;
+        background: #1e1e2e; color: #fff;
+    }
+    .row input[type=color] { width: 50px; height: 30px; border: none; background: none; }
+    .modal .btns { display: flex; gap: 8px; margin-top: 16px; }
+    .modal .btns button { flex: 1; padding: 9px; border: none; border-radius: 8px; color: #fff; font-size: 15px; cursor: pointer; }
+    #saveSet { background: #4caf50; } #resetSet { background: #f44336; } #closeSet { background: #607d8b; }
+    .hint { font-size: 12px; color: #aaa; margin-top: -4px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<div id="game">
+    <div class="topbar">
+        <h1>Sudoku</h1>
+        <button class="icon-btn" id="settingsBtn" title="Settings">&#9881;</button>
+        <button class="icon-btn" id="fullBtn" title="Full screen">&#x26F6;</button>
+    </div>
+
+    <div class="info">
+        <div>Level: <span id="levelInfo"></span></div>
+        <div>Mistakes: <span id="mistakeInfo"></span></div>
+        <div id="timerBox">Time: <span id="timer">00:00</span></div>
+        <div>Best: <span id="bestInfo">--</span></div>
+    </div>
+
+    <div id="board">
+        <div id="overlayMsg"><div id="overlayText"></div><button id="overlayBtn">New Game</button></div>
+    </div>
+
+    <div class="tools">
+        <button id="undoBtn">&#8630; Undo</button>
+        <button id="eraseBtn">&#9003; Erase</button>
+        <button id="notesBtn">&#9998; Notes: Off</button>
+        <button id="hintBtn">&#128161; Hint (<span id="hintCount">3</span>)</button>
+        <button id="pauseBtn">&#10074;&#10074; Pause</button>
+        <button id="newBtn">&#10010; New</button>
+    </div>
+    <div class="pad" id="pad"></div>
+</div>
+
+<!-- Settings modal -->
+<div class="overlay" id="settingsBox">
+    <div class="modal">
+        <h2>&#9881; Settings</h2>
+
+        <h3>Game</h3>
+        <div class="row"><label>Difficulty</label>
+            <select id="sLevel">
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+                <option value="expert">Expert</option>
+            </select>
+        </div>
+        <div class="hint">Changing difficulty starts a new game.</div>
+        <div class="row"><label>Mistake limit (0 = no limit)</label><input type="number" id="sLimit" min="0" max="20"></div>
+        <div class="row"><label>Hints per game</label><input type="number" id="sHints" min="0" max="20"></div>
+        <div class="row"><label>Show mistakes in red</label><input type="checkbox" id="sShowMis"></div>
+        <div class="row"><label>Show timer</label><input type="checkbox" id="sTimer"></div>
+
+        <h3>Help</h3>
+        <div class="row"><label>Highlight row / column / box</label><input type="checkbox" id="sArea"></div>
+        <div class="row"><label>Highlight same numbers</label><input type="checkbox" id="sSame"></div>
+        <div class="row"><label>Auto-remove notes</label><input type="checkbox" id="sAutoNotes"></div>
+
+        <h3>Look</h3>
+        <div class="row"><label>Board size (px)</label><input type="number" id="sSize" min="250" max="900" step="10"></div>
+        <div class="row"><label>Color</label><input type="color" id="sAccent"></div>
+
+        <div class="btns">
+            <button id="saveSet">Save</button>
+            <button id="resetSet">Default</button>
+            <button id="closeSet">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const DEFAULTS = {
+    level: 'medium',
+    showMistakes: true,
+    mistakeLimit: 3,      // 0 = no limit
+    hints: 3,
+    highlightArea: true,  // row / column / box
+    highlightSame: true,  // same numbers
+    autoNotes: true,      // remove notes when number placed
+    showTimer: true,
+    boardSize: 450,       // px (normal mode)
+    accent: '#4a90e2',
+};
+// Best times per level are kept in this browser (localStorage)
+let best = (() => { try { return JSON.parse(localStorage.getItem('sudokuBest')) || {}; } catch (e) { return {}; } })();
+
+// ================== SUDOKU GENERATOR ==================
+// Grid is a flat array of 81 numbers, 0 = empty.
+
+// Bitmask of allowed digits (bits 1..9) for cell i
+function candidates(g, i) {
+    const r = Math.floor(i / 9), c = i % 9;
+    let used = 0;
+    for (let k = 0; k < 9; k++) { used |= 1 << g[r * 9 + k]; used |= 1 << g[k * 9 + c]; }
+    const br = r - r % 3, bc = c - c % 3;
+    for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) used |= 1 << g[(br + y) * 9 + bc + x];
+    return (~used) & 0x3FE;
+}
+function bitCount(m) { let n = 0; while (m) { m &= m - 1; n++; } return n; }
+// Find the empty cell with the fewest candidates. Returns [index, mask] or null when full.
+function bestCell(g) {
+    let best = null, bestCount = 10;
+    for (let i = 0; i < 81; i++) {
+        if (g[i] !== 0) continue;
+        const m = candidates(g, i), n = bitCount(m);
+        if (n < bestCount) { best = [i, m]; bestCount = n; if (n <= 1) break; }
+    }
+    return best;
+}
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+// Fill an empty grid with a random full solution
+function fillGrid(g) {
+    const cell = bestCell(g);
+    if (cell === null) return true;
+    const [i, m] = cell, digits = [];
+    for (let d = 1; d <= 9; d++) if (m & (1 << d)) digits.push(d);
+    for (const d of shuffle(digits)) { g[i] = d; if (fillGrid(g)) return true; }
+    g[i] = 0;
+    return false;
+}
+// Count solutions, stop when limit reached
+function countSolutions(g, limit, st) {
+    const cell = bestCell(g);
+    if (cell === null) { st.count++; return; }
+    const [i, m] = cell;
+    for (let d = 1; d <= 9; d++) {
+        if (!(m & (1 << d))) continue;
+        g[i] = d;
+        countSolutions(g, limit, st);
+        if (st.count >= limit) { g[i] = 0; return; }
+    }
+    g[i] = 0;
+}
+function makePuzzle(level) {
+    const clues = { easy: 40, medium: 32, hard: 27, expert: 23 }[level] || 32;
+    const g = Array(81).fill(0);
+    fillGrid(g);
+    const solution = g.slice();
+    let left = 81;
+    for (const i of shuffle([...Array(81).keys()])) {
+        if (left <= clues) break;
+        const keep = g[i];
+        g[i] = 0;
+        const st = { count: 0 };
+        countSolutions(g.slice(), 2, st);
+        if (st.count !== 1) g[i] = keep; // must stay unique
+        else left--;
+    }
+    return { puzzle: g, solution, level, clues: left };
+}
+// Hard levels: try a few puzzles and keep the one with the fewest clues
+function generateSudoku(level) {
+    const tries = { hard: 3, expert: 6 }[level] || 1;
+    let bestP = null;
+    for (let t = 0; t < tries; t++) { const p = makePuzzle(level); if (!bestP || p.clues < bestP.clues) bestP = p; }
+    return bestP;
+}
+const $ = id => document.getElementById(id);
+const boardEl = $('board');
+
+let cfg = loadCfg();
+let puzzle, solution, level, grid, notes, given, selected = -1;
+let mistakes, hintsLeft, history, seconds, timerId, paused = false, over = false, notesMode = false;
+const cells = [];
+
+// ---------- settings storage ----------
+function loadCfg() {
+    try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('sudokuCfg') || '{}')); }
+    catch (e) { return Object.assign({}, DEFAULTS); }
+}
+function saveCfg() { try { localStorage.setItem('sudokuCfg', JSON.stringify(cfg)); } catch (e) {} }
+function clamp(v, min, max, def) { v = parseInt(v, 10); return isNaN(v) ? def : Math.min(max, Math.max(min, v)); }
+
+// ---------- build board and pad ----------
+for (let i = 0; i < 81; i++) {
+    const d = document.createElement('div');
+    d.className = 'cell';
+    const r = Math.floor(i / 9);
+    if (r === 2 || r === 5) d.classList.add('rowB');
+    if (r === 8) d.classList.add('rowLast');
+    const c = i % 9;
+    if (c === 2 || c === 5) d.classList.add('colB');
+    if (c === 8) d.classList.add('colLast');
+    d.onclick = () => select(i);
+    boardEl.appendChild(d);
+    cells.push(d);
+}
+for (let n = 1; n <= 9; n++) {
+    const b = document.createElement('button');
+    b.innerHTML = n + '<small></small>';
+    b.onclick = () => input(n);
+    $('pad').appendChild(b);
+}
+
+// ---------- game ----------
+function startGame(data) {
+    puzzle = data.puzzle; solution = data.solution; level = data.level;
+    grid = puzzle.slice();
+    given = puzzle.map(v => v !== 0);
+    notes = Array.from({ length: 81 }, () => new Set());
+    mistakes = 0; hintsLeft = cfg.hints; history = []; seconds = 0;
+    selected = -1; over = false; paused = false;
+    $('overlayMsg').classList.remove('show');
+    clearInterval(timerId);
+    timerId = setInterval(tick, 1000);
+    applyLook();
+    render();
+}
+
+function newGame() {
+    $('overlayText').textContent = 'Creating puzzle...';
+    $('overlayBtn').style.display = 'none';
+    $('overlayMsg').classList.add('show');
+    clearInterval(timerId);
+    // small delay so "Creating puzzle..." is shown while the puzzle is made
+    setTimeout(() => startGame(generateSudoku(cfg.level)), 30);
+}
+
+function tick() {
+    if (paused || over) return;
+    seconds++;
+    $('timer').textContent = fmt(seconds);
+}
+function fmt(s) { return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+
+function select(i) {
+    if (paused || over) return;
+    selected = i;
+    render();
+}
+
+function input(n) {
+    if (selected < 0 || paused || over || given[selected]) return;
+    const i = selected;
+    if (notesMode) {
+        if (grid[i]) return;
+        history.push({ i, val: grid[i], notes: new Set(notes[i]) });
+        notes[i].has(n) ? notes[i].delete(n) : notes[i].add(n);
+        render();
+        return;
+    }
+    if (grid[i] === n) return;
+    history.push({ i, val: grid[i], notes: new Set(notes[i]), others: snapshotPeers(i, n) });
+    grid[i] = n;
+    notes[i].clear();
+    if (n !== solution[i]) {
+        mistakes++;
+        if (cfg.mistakeLimit > 0 && mistakes >= cfg.mistakeLimit) {
+            render();
+            return endGame(false);
+        }
+    } else if (cfg.autoNotes) {
+        peers(i).forEach(p => notes[p].delete(n));
+    }
+    render();
+    flashDone(i);
+    if (grid.every((v, k) => v === solution[k])) endGame(true);
+}
+
+function peers(i) {
+    const r = Math.floor(i / 9), c = i % 9, br = r - r % 3, bc = c - c % 3, out = [];
+    for (let k = 0; k < 81; k++) {
+        const kr = Math.floor(k / 9), kc = k % 9;
+        if (k !== i && (kr === r || kc === c || (kr - kr % 3 === br && kc - kc % 3 === bc))) out.push(k);
+    }
+    return out;
+}
+function snapshotPeers(i, n) {
+    return peers(i).filter(p => notes[p].has(n)).map(p => ({ p, n }));
+}
+
+function erase() {
+    if (selected < 0 || paused || over || given[selected]) return;
+    const i = selected;
+    if (!grid[i] && !notes[i].size) return;
+    history.push({ i, val: grid[i], notes: new Set(notes[i]) });
+    grid[i] = 0; notes[i].clear();
+    render();
+}
+
+function undo() {
+    if (paused || over || !history.length) return;
+    const h = history.pop();
+    grid[h.i] = h.val;
+    notes[h.i] = h.notes;
+    (h.others || []).forEach(o => notes[o.p].add(o.n));
+    selected = h.i;
+    render();
+}
+
+function hint() {
+    if (paused || over || hintsLeft <= 0) return;
+    let i = selected;
+    if (i < 0 || given[i] || grid[i] === solution[i]) {
+        const empty = [];
+        grid.forEach((v, k) => { if (v !== solution[k]) empty.push(k); });
+        if (!empty.length) return;
+        i = empty[Math.floor(Math.random() * empty.length)];
+    }
+    hintsLeft--;
+    grid[i] = solution[i];
+    given[i] = true;
+    notes[i].clear();
+    if (cfg.autoNotes) peers(i).forEach(p => notes[p].delete(solution[i]));
+    selected = i;
+    render();
+    flashDone(i);
+    if (grid.every((v, k) => v === solution[k])) endGame(true);
+}
+
+// flash a row/col/box when it gets completed correctly
+function flashDone(i) {
+    const r = Math.floor(i / 9), c = i % 9, br = r - r % 3, bc = c - c % 3;
+    const groups = [
+        [...Array(9)].map((_, k) => r * 9 + k),
+        [...Array(9)].map((_, k) => k * 9 + c),
+        [...Array(9)].map((_, k) => (br + Math.floor(k / 3)) * 9 + bc + k % 3),
+    ];
+    groups.forEach(g => {
+        if (g.every(k => grid[k] === solution[k])) g.forEach(k => {
+            cells[k].classList.remove('flash'); void cells[k].offsetWidth; cells[k].classList.add('flash');
+        });
+    });
+}
+
+function togglePause(force) {
+    if (over) return;
+    paused = force !== undefined ? force : !paused;
+    $('overlayText').textContent = 'Paused';
+    $('overlayBtn').style.display = 'none';
+    $('overlayMsg').classList.toggle('show', paused);
+    $('pauseBtn').innerHTML = paused ? '&#9654; Resume' : '&#10074;&#10074; Pause';
+    if (!paused) $('overlayBtn').style.display = '';
+}
+
+function endGame(win) {
+    over = true;
+    clearInterval(timerId);
+    $('overlayText').innerHTML = win
+        ? 'You Win! &#127881;<br><small style="font-size:16px">Time ' + fmt(seconds) + ' &middot; Mistakes ' + mistakes + '</small>'
+        : 'Game Over<br><small style="font-size:16px">' + mistakes + ' mistakes</small>';
+    $('overlayBtn').style.display = '';
+    $('overlayMsg').classList.add('show');
+    if (win) {
+        if (best[level] == null || seconds < best[level]) best[level] = seconds;
+        try { localStorage.setItem('sudokuBest', JSON.stringify(best)); } catch (e) {}
+        showBest();
+    }
+}
+
+// ---------- drawing ----------
+function render() {
+    const selVal = selected >= 0 ? grid[selected] : 0;
+    const sr = Math.floor(selected / 9), sc = selected % 9;
+    const counts = Array(10).fill(0);
+
+    for (let i = 0; i < 81; i++) {
+        const el = cells[i], v = grid[i];
+        const r = Math.floor(i / 9), c = i % 9;
+        el.classList.remove('given', 'area', 'same', 'sel', 'wrong');
+        if (given[i]) el.classList.add('given');
+        if (v && v === solution[i]) counts[v]++;
+
+        if (selected >= 0) {
+            if (i === selected) el.classList.add('sel');
+            else if (cfg.highlightArea && (r === sr || c === sc ||
+                (Math.floor(r / 3) === Math.floor(sr / 3) && Math.floor(c / 3) === Math.floor(sc / 3))))
+                el.classList.add('area');
+            if (cfg.highlightSame && selVal && v === selVal && i !== selected) el.classList.add('same');
+        }
+        if (v && !given[i] && v !== solution[i] && cfg.showMistakes) el.classList.add('wrong');
+
+        if (v) {
+            el.textContent = v;
+        } else if (notes[i].size) {
+            let h = '<div class="notes">';
+            for (let n = 1; n <= 9; n++) h += '<div>' + (notes[i].has(n) ? n : '') + '</div>';
+            el.innerHTML = h + '</div>';
+        } else {
+            el.textContent = '';
+        }
+    }
+
+    // number pad: remaining count, hide finished numbers
+    [...$('pad').children].forEach((b, k) => {
+        const n = k + 1, left = 9 - counts[n];
+        b.querySelector('small').textContent = left;
+        b.classList.toggle('done', left === 0);
+    });
+
+    $('mistakeInfo').textContent = mistakes + (cfg.mistakeLimit > 0 ? ' / ' + cfg.mistakeLimit : '');
+    $('hintCount').textContent = hintsLeft;
+    $('hintBtn').disabled = hintsLeft <= 0;
+    $('hintBtn').style.opacity = hintsLeft <= 0 ? .5 : 1;
+    $('timer').textContent = fmt(seconds);
+}
+
+function showBest() {
+    $('bestInfo').textContent = best && best[level] != null ? fmt(best[level]) : '--';
+}
+
+function applyLook() {
+    document.documentElement.style.setProperty('--accent', cfg.accent);
+    $('timerBox').style.display = cfg.showTimer ? '' : 'none';
+    $('levelInfo').textContent = level ? level[0].toUpperCase() + level.slice(1) : '';
+    showBest();
+    fitBoard();
+}
+
+// size board to the setting, or to the screen in full screen
+function fitBoard() {
+    let size;
+    if (document.fullscreenElement === $('game')) {
+        size = Math.min(window.innerWidth - 40, window.innerHeight - 230);
+    } else {
+        size = Math.min(cfg.boardSize, window.innerWidth - 32);
+    }
+    size = Math.max(220, Math.floor(size / 9) * 9);
+    document.documentElement.style.setProperty('--size', size + 'px');
+}
+
+// ---------- settings modal ----------
+function fillForm(c) {
+    $('sLevel').value = c.level;
+    $('sLimit').value = c.mistakeLimit;
+    $('sHints').value = c.hints;
+    $('sShowMis').checked = c.showMistakes;
+    $('sTimer').checked = c.showTimer;
+    $('sArea').checked = c.highlightArea;
+    $('sSame').checked = c.highlightSame;
+    $('sAutoNotes').checked = c.autoNotes;
+    $('sSize').value = c.boardSize;
+    $('sAccent').value = c.accent;
+}
+let wasPaused = false;
+function openSettings() {
+    wasPaused = paused;
+    if (!over) togglePause(true);
+    fillForm(cfg);
+    $('settingsBox').classList.add('show');
+}
+function closeSettings() {
+    $('settingsBox').classList.remove('show');
+    if (!over && !wasPaused) togglePause(false);
+}
+$('saveSet').onclick = () => {
+    const oldLevel = cfg.level, oldHints = cfg.hints;
+    cfg.level         = $('sLevel').value;
+    cfg.mistakeLimit  = clamp($('sLimit').value, 0, 20, DEFAULTS.mistakeLimit);
+    cfg.hints         = clamp($('sHints').value, 0, 20, DEFAULTS.hints);
+    cfg.showMistakes  = $('sShowMis').checked;
+    cfg.showTimer     = $('sTimer').checked;
+    cfg.highlightArea = $('sArea').checked;
+    cfg.highlightSame = $('sSame').checked;
+    cfg.autoNotes     = $('sAutoNotes').checked;
+    cfg.boardSize     = clamp($('sSize').value, 250, 900, DEFAULTS.boardSize);
+    cfg.accent        = $('sAccent').value;
+    saveCfg();
+    $('settingsBox').classList.remove('show');
+    if (cfg.level !== oldLevel) return newGame();
+    if (cfg.hints !== oldHints) hintsLeft = Math.max(0, hintsLeft + cfg.hints - oldHints);
+    applyLook();
+    if (!over && !wasPaused) togglePause(false);
+    render();
+};
+$('resetSet').onclick = () => fillForm(DEFAULTS); // press Save to apply
+$('closeSet').onclick = closeSettings;
+$('settingsBox').onclick = e => { if (e.target.id === 'settingsBox') closeSettings(); };
+
+// ---------- full screen ----------
+$('fullBtn').onclick = () => {
+    if (!document.fullscreenElement) {
+        if ($('game').requestFullscreen) $('game').requestFullscreen().catch(() => {});
+    } else {
+        document.exitFullscreen();
+    }
+};
+document.addEventListener('fullscreenchange', () => {
+    const box = $('settingsBox');
+    if (document.fullscreenElement) document.fullscreenElement.appendChild(box);
+    else document.body.appendChild(box);
+    $('fullBtn').innerHTML = document.fullscreenElement ? '&#x2715;' : '&#x26F6;';
+    $('fullBtn').title = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+    fitBoard();
+});
+window.addEventListener('resize', fitBoard);
+
+// ---------- buttons & keyboard ----------
+$('undoBtn').onclick = undo;
+$('eraseBtn').onclick = erase;
+$('hintBtn').onclick = hint;
+$('pauseBtn').onclick = () => togglePause();
+$('newBtn').onclick = newGame;
+$('overlayBtn').onclick = newGame;
+$('settingsBtn').onclick = openSettings;
+$('notesBtn').onclick = () => {
+    notesMode = !notesMode;
+    $('notesBtn').classList.toggle('on', notesMode);
+    $('notesBtn').innerHTML = '&#9998; Notes: ' + (notesMode ? 'On' : 'Off');
+};
+
+document.addEventListener('keydown', e => {
+    if ($('settingsBox').classList.contains('show')) return;
+    if (e.key >= '1' && e.key <= '9') return input(+e.key);
+    if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') return erase();
+    if (e.key === 'n' || e.key === 'N') return $('notesBtn').onclick();
+    if (e.key === 'f' || e.key === 'F') return $('fullBtn').onclick();
+    if (e.key === 'p' || e.key === 'P') return togglePause();
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); return undo(); }
+    const mv = { ArrowUp: -9, ArrowDown: 9, ArrowLeft: -1, ArrowRight: 1 }[e.key];
+    if (mv !== undefined) {
+        e.preventDefault();
+        if (selected < 0) return select(0);
+        const r = Math.floor(selected / 9), c = selected % 9;
+        if ((mv === -1 && c === 0) || (mv === 1 && c === 8) || selected + mv < 0 || selected + mv > 80) return;
+        select(selected + mv);
+    }
+});
+
+// first game
+startGame(generateSudoku(cfg.level));
+</script>
+</body>
+</html>

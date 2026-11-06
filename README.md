@@ -30,3 +30,15 @@ Photos: if no Image URL is given, the page looks for `images/<name>.jpg` (also `
 ## Note about the secret key
 
 Because this is a static site, `config.js` (including `SECRET_KEY`) can be read by anyone who visits. The signature stops people from simply editing a link to change the name, but someone who reads the code could make their own links. Change `SECRET_KEY` to your own text before making real links (old links stop working when you change it).
+
+## Games
+
+Also in this site, in the `games/` folder (plain HTML + JavaScript, no server):
+
+| Page | Game |
+|---|---|
+| `games/` | Menu of all games |
+| `games/snake.html` | Snake. High score is saved in your browser |
+| `games/snake-multy.html` | Multiplayer Snake, up to 8 players per room. The first player in a room hosts the game in their browser (keep that tab open); others join with the same room name from any network. Uses [PeerJS](https://peerjs.com/) to connect the browsers |
+| `games/snake_ladder.html` | Snake & Ladder, 2–4 players or computer. Wins are saved in your browser |
+| `games/sudoku.html` | Sudoku with 4 levels. Puzzles are made in the browser; best times are saved in your browser |
