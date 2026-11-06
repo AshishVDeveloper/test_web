@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect Person</title>
+<!--
+  One-to-one video + audio call with chat, straight between two browsers, on any network.
+  One person clicks "Start a call" and gets a code (or link / QR code); the other opens it.
+  Uses PeerJS (https://peerjs.com/). Video, sound and chat go directly between the two browsers.
+  No camera or microphone? You can still join and chat.
+-->
+<style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { font-family: Arial, sans-serif; background: #1e1e2e; color: #fff; margin: 0; }
+    .hidden { display: none !important; }
+    button, .btn {
+        padding: 10px 18px; font-size: 15px; border: none; border-radius: 8px; color: #fff; cursor: pointer;
+        background: #4caf50; font-family: inherit;
+    }
+    button:hover { filter: brightness(1.1); }
+    button:disabled { opacity: .5; cursor: default; filter: none; }
+    button.grey { background: #607d8b; }
+    input[type=text] {
+        padding: 10px; font-size: 16px; border-radius: 8px; border: 1px solid #555; background: #1e1e2e; color: #fff;
+        width: 100%; min-width: 0; font-family: inherit;
+    }
+    .err { color: #ff6b6b; font-size: 14px; min-height: 18px; margin-top: 10px; text-align: center; }
+    .hint { color: #aaa; font-size: 13px; line-height: 1.5; margin: 8px 0 0; }
+
+    /* ---------- start screen ---------- */
+    #startView { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
+    h1 { margin: 0 0 4px; font-size: 26px; text-align: center; }
+    .sub { margin: 0 0 20px; text-align: center; color: #bbb; font-size: 14px; }
+    .panel { background: #2b2b40; border-radius: 12px; padding: 18px; }
+    .panel h2 { margin: 0 0 10px; font-size: 17px; color: #ffd166; }
+    .panel p { margin: 0 0 14px; color: #ccc; font-size: 14px; line-height: 1.5; flex: 1; }
+    .nameRow { margin-bottom: 14px; }
+    .nameRow label { display: block; font-size: 14px; color: #ccc; margin-bottom: 6px; }
+    .start { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .start .panel { display: flex; flex-direction: column; }
+    .joinRow { display: flex; gap: 8px; }
+    #codeIn { letter-spacing: 3px; text-transform: uppercase; font-size: 18px; }
+
+    /* ---------- call screen ---------- */
+    #callView { display: grid; grid-template-columns: 1fr 340px; height: 100vh; height: 100dvh; }
+    .stageCol { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+    #stage { position: relative; flex: 1; background: #000; min-height: 0; overflow: hidden; }
+    #remoteVideo { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+    #localVideo {
+        position: absolute; right: 12px; bottom: 12px; width: 26%; max-width: 220px; min-width: 96px; aspect-ratio: 4 / 3;
+        object-fit: cover; border-radius: 10px; border: 2px solid rgba(255,255,255,.6); background: #222;
+        transform: scaleX(-1);   /* mirror, like a mirror */
+    }
+    #localVideo.back { transform: none; }
+    .waitBox {
+        position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 10px; padding: 16px; text-align: center; overflow-y: auto;
+    }
+    .codeText { font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #ffd166; }
+    #qr { background: #fff; padding: 8px; border-radius: 8px; line-height: 0; }
+    #qr img, #qr canvas { width: 140px; height: 140px; }
+    .linkRow { display: flex; gap: 8px; width: min(420px, 100%); }
+    .linkRow input { font-size: 13px; padding: 8px; }
+    #remoteLabel {
+        position: absolute; left: 12px; top: 12px; background: rgba(0,0,0,.55); padding: 6px 10px; border-radius: 8px;
+        font-size: 14px; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #remoteOff {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column;
+        gap: 8px; color: #ccc; font-size: 15px; pointer-events: none;
+    }
+    #remoteOff .av {
+        width: 96px; height: 96px; border-radius: 50%; background: #3a3a55; display: flex; align-items: center;
+        justify-content: center; font-size: 40px; font-weight: bold; color: #ffd166;
+    }
+    .bar { display: flex; justify-content: center; gap: 12px; padding: 12px; background: #2b2b40; flex-wrap: wrap; }
+    .round {
+        width: 52px; height: 52px; padding: 0; border-radius: 50%; background: #3a3a55; font-size: 22px;
+        display: flex; align-items: center; justify-content: center; position: relative;
+    }
+    .round.off { background: #f44336; }
+    .round.off::after { content: ''; position: absolute; width: 60%; height: 3px; background: #fff; transform: rotate(-45deg); border-radius: 2px; }
+    .round.end { background: #f44336; width: 64px; border-radius: 26px; }
+    #chatToggle { display: none; }
+    .badge {
+        position: absolute; top: -2px; right: -2px; min-width: 20px; height: 20px; border-radius: 10px; background: #ff9800;
+        font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center; padding: 0 5px;
+    }
+
+    /* chat */
+    #chat { display: flex; flex-direction: column; background: #24243a; border-left: 1px solid #3a3a55; min-height: 0; }
+    .chatHead { padding: 12px 14px; font-weight: bold; color: #ffd166; border-bottom: 1px solid #3a3a55; display: flex; align-items: center; gap: 8px; }
+    .chatHead .led { width: 10px; height: 10px; border-radius: 50%; background: #ff9800; flex: none; }
+    .chatHead .led.on { background: #4caf50; }
+    .chatHead #statusText { font-weight: normal; color: #ccc; font-size: 13px; }
+    .chatHead #chatClose { margin-left: auto; display: none; background: none; padding: 4px 8px; font-size: 20px; }
+    #msgs { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+    .msg { max-width: 85%; padding: 8px 11px; border-radius: 12px; background: #3a3a55; font-size: 14px; line-height: 1.4; word-wrap: break-word; white-space: pre-wrap; }
+    .msg.me { align-self: flex-end; background: #2e7d32; }
+    .msg .meta { font-size: 11px; color: #ccc; margin-bottom: 2px; }
+    .msg.sys { align-self: center; background: none; color: #999; font-size: 12px; padding: 2px; }
+    .chatIn { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #3a3a55; }
+    .chatIn button { padding: 10px 14px; }
+
+    /* phones and narrow windows */
+    @media (max-width: 800px) {
+        #callView { grid-template-columns: 1fr; }
+        #chat {
+            position: fixed; inset: auto 0 0 0; height: 60vh; height: 60dvh; z-index: 5; border-left: none;
+            border-top: 1px solid #3a3a55; border-radius: 14px 14px 0 0; box-shadow: 0 -6px 20px rgba(0,0,0,.5);
+            transform: translateY(105%); transition: transform .2s;
+        }
+        #chat.open { transform: none; }
+        #chatToggle { display: flex; }
+        .chatHead #chatClose { display: block; }
+        .bar { gap: 10px; padding: 10px; }
+        .round { width: 48px; height: 48px; font-size: 20px; }
+    }
+    @media (max-width: 560px) {
+        .start { grid-template-columns: 1fr; }
+        #startView { padding: 16px 8px; }
+        .codeText { font-size: 26px; }
+        #qr img, #qr canvas { width: 110px; height: 110px; }
+        #localVideo { width: 30%; right: 8px; bottom: 8px; }
+    }
+</style>
+</head>
+<body>
+
+<!-- ===== Start ===== -->
+<section id="startView">
+    <h1>&#128249; Connect Person</h1>
+    <p class="sub">Video call, voice and chat with one person, straight between your two devices. No sign-in.</p>
+
+    <div class="panel nameRow">
+        <label for="nameIn">Your name</label>
+        <input type="text" id="nameIn" maxlength="30" placeholder="So the other person knows who you are">
+    </div>
+
+    <div class="start">
+        <div class="panel">
+            <h2>Start a call</h2>
+            <p>Get a code, link and QR code. Send it to the person you want to talk to.</p>
+            <button id="hostBtn">Start a call</button>
+        </div>
+        <div class="panel">
+            <h2>Join a call</h2>
+            <p>Got a code? Enter it here, or just open the link or scan the QR code you were given.</p>
+            <div class="joinRow">
+                <input type="text" id="codeIn" maxlength="6" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false">
+                <button id="joinBtn">Join</button>
+            </div>
+        </div>
+    </div>
+    <p class="hint" style="text-align:center">Your browser will ask to use the camera and microphone. Without them you can still chat.</p>
+    <div class="err" id="startErr"></div>
+</section>
+
+<!-- ===== Call ===== -->
+<section id="callView" class="hidden">
+    <div class="stageCol">
+        <div id="stage">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <div id="remoteOff" class="hidden"><div class="av" id="remoteAv">?</div><div id="remoteOffText">Camera is off</div></div>
+            <div id="remoteLabel" class="hidden"></div>
+
+            <div class="waitBox" id="waitBox">
+                <div id="waitTitle" style="font-size:17px;color:#ccc">Waiting for the other person…</div>
+                <div id="qr"></div>
+                <div class="codeText" id="codeText"></div>
+                <div class="linkRow">
+                    <input type="text" id="linkIn" readonly>
+                    <button id="copyBtn" class="grey">Copy</button>
+                </div>
+                <p class="hint" id="waitHint">Send this link or code to the other person. Keep this page open.</p>
+            </div>
+
+            <video id="localVideo" autoplay playsinline muted></video>
+        </div>
+        <div class="bar">
+            <button class="round" id="micBtn" title="Mute microphone">&#127908;</button>
+            <button class="round" id="camBtn" title="Turn camera off">&#128247;</button>
+            <button class="round hidden" id="flipBtn" title="Switch camera">&#128260;</button>
+            <button class="round" id="chatToggle" title="Chat">&#128172;<span class="badge hidden" id="badge">0</span></button>
+            <button class="round end" id="endBtn" title="End call">&#128222;</button>
+        </div>
+    </div>
+
+    <aside id="chat">
+        <div class="chatHead">
+            <span class="led" id="led"></span> Chat <span id="statusText">Waiting…</span>
+            <button id="chatClose" title="Close chat">&#x2715;</button>
+        </div>
+        <div id="msgs"></div>
+        <form class="chatIn" id="chatForm" autocomplete="off">
+            <input type="text" id="chatIn" maxlength="1000" placeholder="Type a message…" disabled>
+            <button id="sendBtn" disabled>Send</button>
+        </form>
+    </aside>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+'use strict';
+const PREFIX = 'tw-connect-';                          // PeerJS id of the person who started the call
+const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no 0/O or 1/I, easy to read out
+const $ = id => document.getElementById(id);
+
+let peer = null, isHost = false, code = '';
+let dataConn = null, mediaCall = null;
+let localStream = null, facing = 'user';
+let myName = '', otherName = 'Other person';
+let remoteHasMedia = false, unread = 0;
+
+/* ---------- helpers ---------- */
+function makeCode() { return [...crypto.getRandomValues(new Uint8Array(6))].map(x => LETTERS[x % LETTERS.length]).join(''); }
+function link() { return location.origin + location.pathname + '?code=' + code; }
+function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function hhmm() { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+function initial(n) { return (Array.from(String(n).trim())[0] || '?').toUpperCase(); }
+
+/* ---------- camera + microphone ---------- */
+async function getMedia() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        sysMsg(window.isSecureContext ? 'This browser cannot use the camera. You can still chat.'
+                                      : 'Camera needs a secure page (https or localhost). You can still chat.');
+        return null;
+    }
+    const tries = [
+        { video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: { echoCancellation: true, noiseSuppression: true } },
+        { video: false, audio: true },
+    ];
+    for (const c of tries) {
+        try { return await navigator.mediaDevices.getUserMedia(c); } catch (e) { /* try the next one */ }
+    }
+    sysMsg('Camera and microphone are blocked or not found. You can still chat.');
+    return null;
+}
+function showLocal() {
+    const v = $('localVideo');
+    const hasVideo = localStream && localStream.getVideoTracks().length;
+    v.classList.toggle('hidden', !hasVideo);
+    if (hasVideo) v.srcObject = localStream;
+    $('micBtn').disabled = !(localStream && localStream.getAudioTracks().length);
+    $('camBtn').disabled = !hasVideo;
+    // switch camera button only when there is more than one camera (phones)
+    if (hasVideo && navigator.mediaDevices.enumerateDevices) {
+        navigator.mediaDevices.enumerateDevices().then(d => {
+            $('flipBtn').classList.toggle('hidden', d.filter(x => x.kind === 'videoinput').length < 2);
+        }).catch(() => {});
+    }
+}
+function stopLocal() {
+    if (localStream) localStream.getTracks().forEach(t => t.stop());
+    localStream = null;
+}
+
+/* ---------- screens ---------- */
+function showCall() {
+    $('startView').classList.add('hidden');
+    $('callView').classList.remove('hidden');
+    $('startErr').textContent = '';
+    $('codeText').textContent = code;
+    $('linkIn').value = link();
+    $('qr').textContent = '';
+    $('qr').classList.remove('hidden');
+    if (window.QRCode) {
+        try { new QRCode($('qr'), { text: link(), width: 280, height: 280, correctLevel: QRCode.CorrectLevel.M }); }
+        catch (e) { $('qr').classList.add('hidden'); }
+    } else $('qr').classList.add('hidden');
+    $('waitTitle').textContent = isHost ? 'Waiting for the other person…' : 'Connecting…';
+    $('waitHint').textContent = isHost ? 'Send this link or code to the other person. Keep this page open.' : 'Joining code ' + code + '…';
+    $('qr').classList.toggle('hidden', !isHost || !window.QRCode);
+    $('linkIn').parentNode.classList.toggle('hidden', !isHost);
+    // only the joining side keeps ?code= in the address, so a reload joins again
+    history.replaceState(null, '', location.pathname + (isHost ? '' : '?code=' + code));
+    showLocal();
+    setStatus();
+}
+function backToStart(msg) {
+    if (mediaCall) { try { mediaCall.close(); } catch (e) {} }
+    if (dataConn) { try { dataConn.close(); } catch (e) {} }
+    if (peer) { try { peer.destroy(); } catch (e) {} }
+    peer = dataConn = mediaCall = null;
+    stopLocal();
+    resetRemote();
+    $('msgs').textContent = '';
+    otherName = 'Other person'; remoteHasMedia = false;
+    $('callView').classList.add('hidden');
+    $('startView').classList.remove('hidden');
+    $('startErr').textContent = msg || '';
+    $('hostBtn').disabled = $('joinBtn').disabled = false;
+    $('chat').classList.remove('open');
+    unread = 0; updateBadge();
+    history.replaceState(null, '', location.pathname);
+}
+function setStatus() {
+    const on = !!(dataConn && dataConn.open);
+    $('led').classList.toggle('on', on);
+    $('statusText').textContent = on ? 'with ' + otherName : (isHost ? 'Waiting…' : 'Connecting…');
+    $('chatIn').disabled = $('sendBtn').disabled = !on;
+    $('waitBox').classList.toggle('hidden', on);
+    $('remoteLabel').classList.toggle('hidden', !on);
+    $('remoteLabel').textContent = otherName;
+    updateRemoteView();
+}
+function resetRemote() {
+    const rv = $('remoteVideo');
+    rv.srcObject = null;
+    delete rv.dataset.cam;
+    delete rv.dataset.mic;
+}
+function updateRemoteView(state) {
+    const on = !!(dataConn && dataConn.open);
+    const rv = $('remoteVideo');
+    const s = rv.srcObject;
+    const hasVideo = s && s.getVideoTracks().some(t => t.readyState === 'live');
+    const camOn = state ? state.cam : (rv.dataset.cam !== '0');
+    if (state) { rv.dataset.cam = state.cam ? '1' : '0'; rv.dataset.mic = state.mic ? '1' : '0'; }
+    const show = on && (!hasVideo || !camOn);
+    $('remoteOff').classList.toggle('hidden', !show);
+    $('remoteAv').textContent = initial(otherName);
+    let t = !remoteHasMedia ? otherName + ' has no camera or microphone (chat only)' : (!hasVideo ? 'Voice only' : 'Camera is off');
+    if (remoteHasMedia && rv.dataset.mic === '0') t += ' · muted';
+    $('remoteOffText').textContent = t;
+    $('remoteLabel').textContent = otherName + (rv.dataset.mic === '0' ? ' 🔇' : '');
+}
+
+/* ---------- start a call (host) ---------- */
+async function host(tries) {
+    tries = tries || 0;
+    if (!saveName()) return;
+    isHost = true; code = makeCode();
+    $('hostBtn').disabled = $('joinBtn').disabled = true;
+    $('startErr').textContent = 'Starting…';
+    if (!tries) localStream = await getMedia();
+    peer = new Peer(PREFIX + code, { debug: 0 });
+    peer.on('open', () => showCall());
+    peer.on('connection', c => {
+        if (dataConn && dataConn.open) {           // already talking to someone: say busy
+            c.on('open', () => { c.send({ t: 'busy' }); setTimeout(() => c.close(), 500); });
+            return;
+        }
+        setupData(c);
+    });
+    peer.on('call', call => {
+        if (mediaCall && mediaCall.open) { call.close(); return; }
+        answerCall(call);
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+    peer.on('error', e => {
+        if (e.type === 'unavailable-id' && tries < 5) { peer.destroy(); host(tries + 1); return; }   // code taken: try another
+        if (!$('callView').classList.contains('hidden')) { sysMsg('Connection problem: ' + (e.type || e.message)); return; }
+        backToStart('Cannot reach the connection server (' + (e.type || e.message) + '). Check your internet and try again.');
+    });
+}
+
+/* ---------- join a call ---------- */
+async function join(c) {
+    c = String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (c.length !== 6) { $('startErr').textContent = 'The code has 6 letters and numbers.'; return; }
+    if (!saveName()) return;
+    isHost = false; code = c;
+    $('hostBtn').disabled = $('joinBtn').disabled = true;
+    $('startErr').textContent = 'Connecting…';
+    localStream = await getMedia();
+    peer = new Peer({ debug: 0 });
+    peer.on('open', () => {
+        showCall();
+        setupData(peer.connect(PREFIX + code, { reliable: true }));
+    });
+    peer.on('call', call => answerCall(call));     // the host calls us when we have no camera/mic
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+    peer.on('error', e => {
+        if (e.type === 'peer-unavailable') backToStart('Nobody is waiting with code ' + code + '. Check the code, or ask the other person to start the call again.');
+        else backToStart('Cannot connect (' + (e.type || e.message) + '). Check your internet and try again.');
+    });
+}
+
+/* ---------- chat + control messages ---------- */
+function setupData(c) {
+    dataConn = c;
+    c.on('open', () => {
+        c.send({ t: 'hello', name: myName, media: !!localStream });
+        sendState();
+        setStatus();
+    });
+    c.on('data', m => {
+        if (!m || typeof m !== 'object') return;
+        if (m.t === 'hello') {
+            otherName = String(m.name || 'Other person').slice(0, 30);
+            remoteHasMedia = !!m.media;
+            sysMsg(otherName + ' joined');
+            setStatus();
+            // Who starts the video call: the joiner, if they have camera/mic.
+            // If the joiner has none, the host calls them so they still see and hear the host.
+            if (!isHost && localStream) startCall();
+            if (isHost && !remoteHasMedia && localStream) startCall();
+        }
+        else if (m.t === 'chat') addMsg(String(m.text || '').slice(0, 1000), otherName, false);
+        else if (m.t === 'state') updateRemoteView(m);
+        else if (m.t === 'bye') backToStart(otherName + ' ended the call.');
+        else if (m.t === 'busy') backToStart('This call already has two people. Ask for a new code.');
+    });
+    c.on('close', () => {
+        if (dataConn !== c) return;
+        if (isHost) {
+            // stay ready for someone to join again with the same code
+            sysMsg(otherName + ' left');
+            dataConn = null;
+            if (mediaCall) { try { mediaCall.close(); } catch (e) {} mediaCall = null; }
+            resetRemote();
+            otherName = 'Other person'; remoteHasMedia = false;
+            setStatus();
+        } else backToStart('The call has ended.');
+    });
+}
+function sendState() {
+    if (!dataConn || !dataConn.open || !localStream) return;
+    const a = localStream.getAudioTracks()[0], v = localStream.getVideoTracks()[0];
+    dataConn.send({ t: 'state', mic: !!(a && a.enabled), cam: !!(v && v.enabled) });
+}
+
+/* ---------- video + audio ---------- */
+function startCall() {
+    const call = peer.call(dataConn.peer, localStream);
+    if (call) watchCall(call);
+}
+function answerCall(call) {
+    call.answer(localStream || undefined);
+    watchCall(call);
+}
+function watchCall(call) {
+    mediaCall = call;
+    call.on('stream', s => {
+        const rv = $('remoteVideo');
+        rv.srcObject = s;
+        rv.play().catch(() => sysMsg('Tap the video to start the sound.'));
+        s.getTracks().forEach(t => { t.onended = () => updateRemoteView(); t.onmute = t.onunmute = () => updateRemoteView(); });
+        updateRemoteView();
+    });
+    call.on('close', () => { if (mediaCall === call) { mediaCall = null; $('remoteVideo').srcObject = null; updateRemoteView(); } });
+    call.on('error', () => sysMsg('Video connection problem. Chat still works.'));
+}
+
+/* ---------- chat ---------- */
+function addMsg(text, who, me) {
+    const d = document.createElement('div');
+    d.className = 'msg' + (me ? ' me' : '');
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = (me ? 'You' : who) + ' · ' + hhmm();
+    d.append(meta, document.createTextNode(text));
+    $('msgs').appendChild(d);
+    $('msgs').scrollTop = $('msgs').scrollHeight;
+    if (!me && !$('chat').classList.contains('open') && getComputedStyle($('chatToggle')).display !== 'none') { unread++; updateBadge(); }
+}
+function sysMsg(text) {
+    const d = document.createElement('div');
+    d.className = 'msg sys';
+    d.textContent = text;
+    $('msgs').appendChild(d);
+    $('msgs').scrollTop = $('msgs').scrollHeight;
+}
+function updateBadge() {
+    $('badge').textContent = unread > 9 ? '9+' : unread;
+    $('badge').classList.toggle('hidden', !unread);
+}
+$('chatForm').onsubmit = e => {
+    e.preventDefault();
+    const text = $('chatIn').value.trim();
+    if (!text || !dataConn || !dataConn.open) return;
+    dataConn.send({ t: 'chat', text });
+    addMsg(text, myName, true);
+    $('chatIn').value = '';
+};
+
+/* ---------- buttons ---------- */
+function saveName() {
+    myName = $('nameIn').value.trim().slice(0, 30);
+    if (!myName) { $('startErr').textContent = 'Please enter your name first.'; $('nameIn').focus(); return false; }
+    lsSet('connectName', myName);
+    return true;
+}
+$('hostBtn').onclick = () => host();
+$('joinBtn').onclick = () => join($('codeIn').value);
+$('codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') join($('codeIn').value); });
+$('copyBtn').onclick = async () => {
+    try { await navigator.clipboard.writeText($('linkIn').value); }
+    catch (e) { $('linkIn').select(); document.execCommand('copy'); }
+    $('copyBtn').textContent = 'Copied'; setTimeout(() => { $('copyBtn').textContent = 'Copy'; }, 1500);
+};
+$('micBtn').onclick = () => {
+    const t = localStream && localStream.getAudioTracks()[0]; if (!t) return;
+    t.enabled = !t.enabled;
+    $('micBtn').classList.toggle('off', !t.enabled);
+    $('micBtn').title = t.enabled ? 'Mute microphone' : 'Unmute microphone';
+    sendState();
+};
+$('camBtn').onclick = () => {
+    const t = localStream && localStream.getVideoTracks()[0]; if (!t) return;
+    t.enabled = !t.enabled;
+    $('camBtn').classList.toggle('off', !t.enabled);
+    $('camBtn').title = t.enabled ? 'Turn camera off' : 'Turn camera on';
+    $('localVideo').style.opacity = t.enabled ? 1 : .3;
+    sendState();
+};
+$('flipBtn').onclick = async () => {
+    const old = localStream && localStream.getVideoTracks()[0]; if (!old) return;
+    const next = facing === 'user' ? 'environment' : 'user';
+    try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: next } } });
+        const nt = s.getVideoTracks()[0];
+        nt.enabled = old.enabled;
+        if (mediaCall && mediaCall.peerConnection) {
+            const sender = mediaCall.peerConnection.getSenders().find(x => x.track && x.track.kind === 'video');
+            if (sender) await sender.replaceTrack(nt);
+        }
+        localStream.removeTrack(old); old.stop();
+        localStream.addTrack(nt);
+        facing = next;
+        $('localVideo').srcObject = localStream;
+        $('localVideo').classList.toggle('back', facing === 'environment');
+    } catch (e) { sysMsg('Could not switch camera.'); }
+};
+$('endBtn').onclick = () => {
+    if (dataConn && dataConn.open && !confirm('End the call?')) return;
+    if (dataConn && dataConn.open) { try { dataConn.send({ t: 'bye' }); } catch (e) {} }
+    setTimeout(() => backToStart(''), 150);
+};
+$('chatToggle').onclick = () => { $('chat').classList.add('open'); unread = 0; updateBadge(); setTimeout(() => $('chatIn').focus(), 200); };
+$('chatClose').onclick = () => $('chat').classList.remove('open');
+$('remoteVideo').onclick = () => $('remoteVideo').play().catch(() => {});
+window.addEventListener('beforeunload', () => { if (dataConn && dataConn.open) { try { dataConn.send({ t: 'bye' }); } catch (e) {} } });
+
+/* ---------- start ---------- */
+$('nameIn').value = lsGet('connectName');
+const fromLink = new URLSearchParams(location.search).get('code');
+if (!window.Peer) $('startErr').textContent = 'Could not load PeerJS. Check your internet connection and reload the page.';
+else if (fromLink) {
+    $('codeIn').value = fromLink.toUpperCase().slice(0, 6);
+    if ($('nameIn').value.trim()) join(fromLink);
+    else { $('startErr').textContent = 'Enter your name, then click Join.'; $('nameIn').focus(); }
+}
+</script>
+</body>
+</html>

@@ -35,6 +35,10 @@ Because this is a static site, `config.js` (including `SECRET_KEY`) can be read 
 
 `file-sharing.html` sends files straight from one browser to another, on any network. One person clicks **Share files** and gets a code, link and QR code; the other opens it. Files go directly between the browsers with [PeerJS](https://peerjs.com/), not through a server. Both sides can send, and several people can join one code. Keep the page open until the transfer finishes. Received files are held in memory until saved, so very large files (over about 1 GB) may fail, especially on phones.
 
+## Connect Person
+
+`connect-person.html` is a one-to-one video call with voice and chat. One person clicks **Start a call** and gets a code, link and QR code; the other opens it. Video, sound and chat go directly between the two browsers with [PeerJS](https://peerjs.com/). There are buttons to mute, turn the camera off, switch between front and back camera (phones), and end the call. Without a camera or microphone you can still join, see and hear the other person, and chat. The camera only works on `https://` pages or `localhost`.
+
 ## Games
 
 Also in this site, in the `games/` folder (plain HTML + JavaScript, no server):
