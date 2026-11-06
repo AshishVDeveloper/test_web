@@ -81,6 +81,18 @@
     #saveSet { background: #4caf50; } #resetSet { background: #f44336; } #closeSet { background: #607d8b; }
     .hint { font-size: 12px; color: #aaa; margin: 4px 0 8px; }
     .err { color: #ff6b6b; font-size: 13px; min-height: 16px; }
+
+    /* Phones */
+    @media (max-width: 699px) {
+        body { padding: 12px 8px; }
+        #game { padding: 4px; }
+        h1 { font-size: 20px; }
+        .info { font-size: 13px; }
+        #game:fullscreen .main { flex-wrap: wrap; }
+        #game:fullscreen { justify-content: flex-start; overflow-y: auto; }
+        .side { width: 100%; }
+        .row input[type=number], .row input[type=text] { width: 110px; }
+    }
 </style>
 </head>
 <body>
@@ -685,8 +697,11 @@ function fit() {
     if (!S) return;
     const { cols, rows } = S.settings;
     const full = document.fullscreenElement === $('game');
-    const availW = full ? window.innerWidth - 320 : Math.min(window.innerWidth - 40, 900);
-    const availH = full ? window.innerHeight - 220 : 600;
+    const vw = document.documentElement.clientWidth, vh = window.innerHeight;
+    const narrow = vw < 700;   // phone: the side panel goes below the board
+    // leave room for page padding + board border (and the side panel when it sits beside the board)
+    const availW = full ? vw - (narrow ? 30 : 320) : Math.min(vw - 64, 900);
+    const availH = full ? vh - (narrow ? 330 : 220) : (narrow ? Math.max(200, vh - 330) : 600);
     cell = Math.max(5, Math.floor(Math.min(availW / cols, availH / rows, full ? 60 : maxCell)));
     if (canvas.width !== cols * cell || canvas.height !== rows * cell) {
         canvas.width = cols * cell; canvas.height = rows * cell;
@@ -877,7 +892,8 @@ document.addEventListener('fullscreenchange', () => {
 window.addEventListener('resize', () => { if (S) render(); });
 
 // ---------- start ----------
-canvas.width = 30 * 16; canvas.height = 20 * 16;
+const startCell = Math.max(5, Math.min(16, Math.floor((document.documentElement.clientWidth - 64) / 30)));
+canvas.width = 30 * startCell; canvas.height = 20 * startCell;
 ctx.fillStyle = '#111'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 $('lanLink').textContent = location.origin + location.pathname;
 me = load('snakeMulty');
