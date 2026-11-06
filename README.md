@@ -37,7 +37,9 @@ Because this is a static site, `config.js` (including `SECRET_KEY`) can be read 
 
 ## Connect Person
 
-`connect-person.html` is a one-to-one video call with voice and chat. One person clicks **Start a call** and gets a code, link and QR code; the other opens it. Video, sound and chat go directly between the two browsers with [PeerJS](https://peerjs.com/). There are buttons to mute, turn the camera off, switch between front and back camera (phones), and end the call. Without a camera or microphone you can still join, see and hear the other person, and chat. The camera only works on `https://` pages or `localhost`.
+`connect-person.html` is a video meeting with voice and chat for up to 6 people. One person clicks **Start a meeting** and gets a code, link and QR code; others open it. Every person connects directly to every other person with [PeerJS](https://peerjs.com/), so video, sound and chat don't go through a server. The person who started only introduces newcomers: if they leave, the others keep talking, but nobody new can join with that code.
+
+Buttons: mute / unmute, camera on / off, switch between front and back camera (always on phones; on computers when there are two cameras), invite more people (shows the code, link and QR code again), chat, and leave. Without a camera or microphone you can still join, see and hear the others, and chat. The camera only works on `https://` pages or `localhost`.
 
 ## Games
 
