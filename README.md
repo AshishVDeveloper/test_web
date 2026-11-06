@@ -37,9 +37,12 @@ Because this is a static site, `config.js` (including `SECRET_KEY`) can be read 
 
 ## Connect Person
 
-`connect-person.html` is a video meeting with voice and chat for up to 6 people. One person clicks **Start a meeting** and gets a code, link and QR code; others open it. Every person connects directly to every other person with [PeerJS](https://peerjs.com/), so video, sound and chat don't go through a server. The person who started only introduces newcomers: if they leave, the others keep talking, but nobody new can join with that code.
+`connect-person.html` does video, voice and chat straight between browsers with [PeerJS](https://peerjs.com/). The starter gets a code, link and QR code; others open it. There are two kinds:
 
-Buttons: mute / unmute, camera on / off, switch between front and back camera (always on phones; on computers when there are two cameras), invite more people (shows the code, link and QR code again), chat, and leave. Without a camera or microphone you can still join, see and hear the others, and chat. The camera only works on `https://` pages or `localhost`.
+- **Private call (1 to 1):** only two people. Once someone joins, the call is locked to them: anyone else who tries the code is turned away, even while the call waits for a dropped person to come back. The same browser tab can rejoin after a reload.
+- **Meeting (group):** up to 12 people. Everyone sees, hears and chats with everyone. Up to 8 videos fit on the screen (4×2 on a computer, 2×4 on a phone); with more, scroll right. The **Invite** button at the top right shows the code, link and QR code again. The person who started only introduces newcomers: if they leave, the others keep talking, but nobody new can join with that code.
+
+Buttons: mute / unmute, camera on / off, switch between front and back camera (always on phones; on computers when there are two cameras), chat, and leave. Without a camera or microphone you can still join, see and hear the others, and chat. The camera only works on `https://` pages or `localhost`. Every person sends video to every other person, so big meetings are heavy on phones; they work best with up to about 4–6 people on video.
 
 ## Games
 
